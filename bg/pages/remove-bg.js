@@ -19,12 +19,11 @@ export default function RemoveBgPage() {
       alert("Please upload an image");
       return;
     }
+
     setLoading(true);
     try {
-      const inputArrayBuffer = await inputImage.arrayBuffer();
-
-      // ✅ use the correct function
-      const resultBlob = await removeBackground(inputArrayBuffer);
+      // ✅ Pass File directly
+      const resultBlob = await removeBackground(inputImage);
 
       const url = URL.createObjectURL(resultBlob);
       setProcessedBlobUrl(url);

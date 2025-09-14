@@ -9,6 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "fa": "^1.0.1",
+    "formidable": "^3.5.4",
+    "fs": "^0.0.1-security",
     "next": "15.5.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -17,6 +20,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@types/formidable": "^3.4.5",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

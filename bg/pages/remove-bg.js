@@ -28,7 +28,6 @@ export default function RemoveBgPage() {
     setLoading(true);
 
     try {
-      // Remove background (transparent)
       const fgBlob = await removeBackground(inputImage);
       const fgBitmap = await createImageBitmap(fgBlob);
 
@@ -37,21 +36,16 @@ export default function RemoveBgPage() {
       canvas.height = fgBitmap.height;
       const ctx = canvas.getContext("2d");
 
-      // Apply background
       if (bgOption === "color") {
         ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       } else if (bgOption === "image" && bgFile) {
         const bgBitmap = await createImageBitmap(bgFile);
-        // Draw background stretched to canvas
         ctx.drawImage(bgBitmap, 0, 0, canvas.width, canvas.height);
-      } 
-      // else transparent -> do nothing
+      }
 
-      // Draw foreground on top
       ctx.drawImage(fgBitmap, 0, 0);
 
-      // Convert canvas to URL
       canvas.toBlob((blob) => {
         const url = URL.createObjectURL(blob);
         setProcessedUrl(url);
@@ -65,52 +59,82 @@ export default function RemoveBgPage() {
   };
 
   return (
-    <div style={{ maxWidth: 700, margin: "auto", padding: 20 }}>
-      <h1>Background Remover & Replacer</h1>
+    <div className="min-h-screen bg-gradient-to-b from-gray-100 via-gray-50 to-white flex flex-col items-center p-6">
+      <h1 className="text-4xl font-bold text-gray-800 mb-8 text-center">
+        Background Remover & Replacer
+      </h1>
 
-      {/* Upload Image */}
-      <div>
-        <label>Upload Image:</label><br />
-        <input type="file" accept="image/*" onChange={handleInputChange} />
-      </div>
-
-      {/* Background options */}
-      <div style={{ marginTop: 15 }}>
-        <label>Background Option:</label><br />
-        <select value={bgOption} onChange={(e) => setBgOption(e.target.value)}>
-          <option value="transparent">Transparent</option>
-          <option value="color">Solid Color</option>
-          <option value="image">Image</option>
-        </select>
-      </div>
-
-      {bgOption === "color" && (
-        <div style={{ marginTop: 10 }}>
-          <label>Pick Color:</label><br />
-          <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} />
+      <div className="bg-white shadow-lg rounded-xl p-6 w-full max-w-xl flex flex-col gap-6">
+        {/* Upload Image */}
+        <div className="flex flex-col">
+          <label className="mb-2 font-semibold text-gray-700">Upload Image:</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleInputChange}
+            className="p-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+          />
         </div>
-      )}
 
-      {bgOption === "image" && (
-        <div style={{ marginTop: 10 }}>
-          <label>Upload Background Image:</label><br />
-          <input type="file" accept="image/*" onChange={handleBgFileChange} />
+        {/* Background Option */}
+        <div className="flex flex-col gap-2">
+          <label className="font-semibold text-gray-700">Background Option:</label>
+          <select
+            value={bgOption}
+            onChange={(e) => setBgOption(e.target.value)}
+            className="p-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+          >
+            <option value="transparent">Transparent</option>
+            <option value="color">Solid Color</option>
+            <option value="image">Image</option>
+          </select>
         </div>
-      )}
 
-      <div style={{ marginTop: 20 }}>
-        <button onClick={processImage} disabled={loading}>
+        {bgOption === "color" && (
+          <div className="flex flex-col gap-2">
+            <label className="font-semibold text-gray-700">Pick Background Color:</label>
+            <input
+              type="color"
+              value={bgColor}
+              onChange={(e) => setBgColor(e.target.value)}
+              className="w-20 h-10 border rounded-lg cursor-pointer"
+            />
+          </div>
+        )}
+
+        {bgOption === "image" && (
+          <div className="flex flex-col gap-2">
+            <label className="font-semibold text-gray-700">Upload Background Image:</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleBgFileChange}
+              className="p-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            />
+          </div>
+        )}
+
+        <button
+          onClick={processImage}
+          disabled={loading}
+          className="bg-yellow-400 hover:bg-yellow-500 text-white font-semibold py-2 rounded-lg shadow transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           {loading ? "Processing..." : "Process Image"}
         </button>
       </div>
 
       {/* Result */}
       {processedUrl && (
-        <div style={{ marginTop: 20 }}>
-          <h3>Result:</h3>
-          <img src={processedUrl} alt="Processed" style={{ maxWidth: "100%" }} />
-          <br />
-          <a href={processedUrl} download="output.png">Download Image</a>
+        <div className="mt-8 bg-white shadow-lg rounded-xl p-6 w-full max-w-xl flex flex-col items-center gap-4">
+          <h2 className="text-2xl font-semibold text-gray-800">Result:</h2>
+          <img src={processedUrl} alt="Processed" className="rounded-lg border border-gray-200 max-w-full" />
+          <a
+            href={processedUrl}
+            download="output.png"
+            className="mt-2 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-white font-semibold rounded-lg shadow transition"
+          >
+            Download Image
+          </a>
         </div>
       )}
     </div>

@@ -6,7 +6,7 @@ export default function RemoveBgPage() {
   const [processedUrl, setProcessedUrl] = useState(null);
   const [bgColor, setBgColor] = useState("#ffffff");
   const [bgFile, setBgFile] = useState(null);
-  const [bgOption, setBgOption] = useState("transparent"); // "transparent", "color", "image"
+  const [bgOption, setBgOption] = useState("transparent");
   const [loading, setLoading] = useState(false);
 
   const handleInputChange = (e) => {
@@ -59,30 +59,30 @@ export default function RemoveBgPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-100 via-gray-50 to-white flex flex-col items-center p-6">
-      <h1 className="text-4xl font-bold text-gray-800 mb-8 text-center">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
+      <h1 className="text-4xl font-bold text-blue-900 mb-8 text-center drop-shadow-lg">
         Background Remover & Replacer
       </h1>
 
-      <div className="bg-white shadow-lg rounded-xl p-6 w-full max-w-xl flex flex-col gap-6">
+      <div className="bg-white shadow-2xl rounded-2xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200">
         {/* Upload Image */}
         <div className="flex flex-col">
-          <label className="mb-2 font-semibold text-gray-700">Upload Image:</label>
+          <label className="mb-2 font-semibold text-blue-800">Upload Image:</label>
           <input
             type="file"
             accept="image/*"
             onChange={handleInputChange}
-            className="p-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            className="p-2 border rounded-lg border-blue-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
           />
         </div>
 
         {/* Background Option */}
         <div className="flex flex-col gap-2">
-          <label className="font-semibold text-gray-700">Background Option:</label>
+          <label className="font-semibold text-blue-800">Background Option:</label>
           <select
             value={bgOption}
             onChange={(e) => setBgOption(e.target.value)}
-            className="p-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            className="p-2 border rounded-lg border-blue-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
           >
             <option value="transparent">Transparent</option>
             <option value="color">Solid Color</option>
@@ -92,7 +92,7 @@ export default function RemoveBgPage() {
 
         {bgOption === "color" && (
           <div className="flex flex-col gap-2">
-            <label className="font-semibold text-gray-700">Pick Background Color:</label>
+            <label className="font-semibold text-blue-800">Pick Background Color:</label>
             <input
               type="color"
               value={bgColor}
@@ -104,12 +104,12 @@ export default function RemoveBgPage() {
 
         {bgOption === "image" && (
           <div className="flex flex-col gap-2">
-            <label className="font-semibold text-gray-700">Upload Background Image:</label>
+            <label className="font-semibold text-blue-800">Upload Background Image:</label>
             <input
               type="file"
               accept="image/*"
               onChange={handleBgFileChange}
-              className="p-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              className="p-2 border rounded-lg border-blue-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
             />
           </div>
         )}
@@ -117,7 +117,7 @@ export default function RemoveBgPage() {
         <button
           onClick={processImage}
           disabled={loading}
-          className="bg-yellow-400 hover:bg-yellow-500 text-white font-semibold py-2 rounded-lg shadow transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-bold py-3 rounded-xl shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? "Processing..." : "Process Image"}
         </button>
@@ -125,13 +125,13 @@ export default function RemoveBgPage() {
 
       {/* Result */}
       {processedUrl && (
-        <div className="mt-8 bg-white shadow-lg rounded-xl p-6 w-full max-w-xl flex flex-col items-center gap-4">
-          <h2 className="text-2xl font-semibold text-gray-800">Result:</h2>
-          <img src={processedUrl} alt="Processed" className="rounded-lg border border-gray-200 max-w-full" />
+        <div className="mt-8 bg-white shadow-2xl rounded-2xl p-6 w-full max-w-xl flex flex-col items-center gap-4 border border-blue-200">
+          <h2 className="text-2xl font-semibold text-blue-900 drop-shadow-md">Result:</h2>
+          <img src={processedUrl} alt="Processed" className="rounded-xl border border-blue-300 max-w-full shadow-lg" />
           <a
             href={processedUrl}
             download="output.png"
-            className="mt-2 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-white font-semibold rounded-lg shadow transition"
+            className="mt-2 px-6 py-3 bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-bold rounded-xl shadow-lg transition"
           >
             Download Image
           </a>

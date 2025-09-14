@@ -3,7 +3,7 @@ import fs from "fs";
 
 export const config = {
   api: {
-    bodyParser: false, // we use formidable
+    bodyParser: false, // using formidable
   },
 };
 
@@ -23,18 +23,17 @@ export default async function handler(req, res) {
       const file = files.image;
       if (!file) return res.status(400).json({ error: "No file uploaded" });
 
-      // 🔑 Get correct path from formidable
-      const filepath = file[0]?.filepath || file.filepath; 
+      // Handle both array and object cases
+      const filepath = Array.isArray(file) ? file[0].filepath : file.filepath;
+      if (!filepath) return res.status(400).json({ error: "Filepath missing" });
 
-      if (!filepath) {
-        return res.status(400).json({ error: "Filepath missing" });
-      }
+      // Read file as buffer
+      const imageBuffer = fs.readFileSync(filepath);
 
-      const imageStream = fs.createReadStream(filepath);
-
+      // Send to remove.bg
       const formData = new FormData();
       formData.append("size", "auto");
-      formData.append("image_file", imageStream);
+      formData.append("image_file", new Blob([imageBuffer]), "upload.png");
 
       const response = await fetch("https://api.remove.bg/v1.0/removebg", {
         method: "POST",

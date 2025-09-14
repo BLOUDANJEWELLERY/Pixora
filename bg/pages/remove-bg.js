@@ -4,14 +4,14 @@ import { removeBackground } from "@imgly/background-removal";
 export default function RemoveBgPage() {
   const [inputImage, setInputImage] = useState(null);
   const [fgBlob, setFgBlob] = useState(null);
+  const [bgOption, setBgOption] = useState("transparent");
   const [bgColor, setBgColor] = useState("#ffffff");
   const [bgFile, setBgFile] = useState(null);
-  const [bgOption, setBgOption] = useState("transparent");
   const [loading, setLoading] = useState(false);
 
   const canvasRef = useRef(null);
 
-  // Whenever fgBlob, bgOption, bgColor, or bgFile changes → redraw canvas
+  // Live preview redraw
   useEffect(() => {
     const drawPreview = async () => {
       if (!fgBlob || !canvasRef.current) return;
@@ -30,30 +30,35 @@ export default function RemoveBgPage() {
         const bgBitmap = await createImageBitmap(bgFile);
         ctx.drawImage(bgBitmap, 0, 0, canvas.width, canvas.height);
       } else {
-        // transparent
         ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
 
-      // Draw foreground
       ctx.drawImage(fgBitmap, 0, 0);
     };
 
     drawPreview();
   }, [fgBlob, bgOption, bgColor, bgFile]);
 
-  const handleInputChange = async (e) => {
+  const handleInputChange = (e) => {
     const file = e.target.files[0];
-    if (!file) return;
-    setInputImage(file);
-    setFgBlob(null);
-    setLoading(true);
+    if (file) {
+      setInputImage(file);
+      setFgBlob(null);
+      setBgFile(null);
+      setBgOption("transparent");
+    }
+  };
 
+  const processImage = async () => {
+    if (!inputImage) return alert("Please upload an image");
+
+    setLoading(true);
     try {
-      const blob = await removeBackground(file);
+      const blob = await removeBackground(inputImage);
       setFgBlob(blob);
     } catch (err) {
       console.error(err);
-      alert("Failed to remove background: " + err.message);
+      alert("Failed to process image: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -81,9 +86,8 @@ export default function RemoveBgPage() {
         Background Remover & Replacer
       </h1>
 
-      {/* Glassmorphic Card */}
+      {/* Glassmorphic Upload Card */}
       <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30 transition-transform transform hover:scale-[1.02] duration-300">
-        {/* Upload Image */}
         <div className="flex flex-col">
           <label className="mb-2 font-semibold text-blue-900">Upload Image:</label>
           <input
@@ -94,51 +98,64 @@ export default function RemoveBgPage() {
           />
         </div>
 
-        {/* Background Option */}
-        <div className="flex flex-col gap-2">
-          <label className="font-semibold text-blue-900">Background Option:</label>
-          <select
-            value={bgOption}
-            onChange={(e) => setBgOption(e.target.value)}
-            className="p-2 border rounded-lg border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/60"
+        {!fgBlob && inputImage && (
+          <button
+            onClick={processImage}
+            disabled={loading}
+            className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-bold py-3 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <option value="transparent">Transparent</option>
-            <option value="color">Solid Color</option>
-            <option value="image">Image</option>
-          </select>
-        </div>
-
-        {bgOption === "color" && (
-          <div className="flex flex-col gap-2">
-            <label className="font-semibold text-blue-900">Pick Background Color:</label>
-            <input
-              type="color"
-              value={bgColor}
-              onChange={(e) => setBgColor(e.target.value)}
-              className="w-20 h-10 border rounded-lg cursor-pointer border-blue-300"
-            />
-          </div>
+            {loading ? "Processing..." : "Process Image"}
+          </button>
         )}
 
-        {bgOption === "image" && (
-          <div className="flex flex-col gap-2">
-            <label className="font-semibold text-blue-900">Upload Background Image:</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleBgFileChange}
-              className="p-2 border rounded-lg border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/60"
-            />
-          </div>
-        )}
+        {/* Show background options only after processing */}
+        {fgBlob && (
+          <>
+            <div className="flex flex-col gap-2">
+              <label className="font-semibold text-blue-900">Background Option:</label>
+              <select
+                value={bgOption}
+                onChange={(e) => setBgOption(e.target.value)}
+                className="p-2 border rounded-lg border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/60"
+              >
+                <option value="transparent">Transparent</option>
+                <option value="color">Solid Color</option>
+                <option value="image">Image</option>
+              </select>
+            </div>
 
-        <button
-          onClick={downloadImage}
-          disabled={!fgBlob}
-          className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-bold py-3 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Download Image
-        </button>
+            {bgOption === "color" && (
+              <div className="flex flex-col gap-2">
+                <label className="font-semibold text-blue-900">Pick Background Color:</label>
+                <input
+                  type="color"
+                  value={bgColor}
+                  onChange={(e) => setBgColor(e.target.value)}
+                  className="w-20 h-10 border rounded-lg cursor-pointer border-blue-300"
+                />
+              </div>
+            )}
+
+            {bgOption === "image" && (
+              <div className="flex flex-col gap-2">
+                <label className="font-semibold text-blue-900">Upload Background Image:</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleBgFileChange}
+                  className="p-2 border rounded-lg border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/60"
+                />
+              </div>
+            )}
+
+            <button
+              onClick={downloadImage}
+              className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-bold py-3 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] mt-4"
+            >
+              Download Image
+            </button>
+          </>
+        )}
       </div>
 
       {/* Preview Card */}

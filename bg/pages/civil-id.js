@@ -1,172 +1,124 @@
 "use client";
-
-import { useState, useRef } from "react";
+import { useState } from "react";
 import jsPDF from "jspdf";
 
 export default function CivilIdPage() {
   const [frontFile, setFrontFile] = useState(null);
   const [backFile, setBackFile] = useState(null);
+  const [frontPreview, setFrontPreview] = useState(null);
+  const [backPreview, setBackPreview] = useState(null);
   const [watermark, setWatermark] = useState("");
-  const [cvReady, setCvReady] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [processed, setProcessed] = useState(false);
-  const canvasRef = useRef(null);
+  const [error, setError] = useState(null);
 
-  // Handle file input
+  const canvasRef = document.createElement("canvas"); // hidden canvas
+
   const handleFileChange = (e, type) => {
-    const file = e.target.files?.[0] || null;
-    if (type === "front") setFrontFile(file);
-    if (type === "back") setBackFile(file);
-  };
-
-  // Convert file to Image element
-  const loadImage = (file) =>
-    new Promise((resolve, reject) => {
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-      img.onload = () => resolve(img);
-      img.onerror = () => reject("Failed to load image");
-    });
-
-  // Auto-crop & deskew using OpenCV
-  const autoCropAndDeskew = async (file) => {
-    const img = await loadImage(file);
-
-    const hidden = document.createElement("canvas");
-    hidden.width = img.width;
-    hidden.height = img.height;
-    const ctx = hidden.getContext("2d");
-    ctx.drawImage(img, 0, 0);
-
-    const src = cv.imread(hidden);
-    const gray = new cv.Mat();
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-
-    const blur = new cv.Mat();
-    cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
-
-    const edges = new cv.Mat();
-    cv.Canny(blur, edges, 75, 200);
-
-    const contours = new cv.MatVector();
-    const hierarchy = new cv.Mat();
-    cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
-
-    let maxArea = 0;
-    let approxCurve = null;
-
-    for (let i = 0; i < contours.size(); i++) {
-      const cnt = contours.get(i);
-      const peri = cv.arcLength(cnt, true);
-      const approx = new cv.Mat();
-      cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
-
-      if (approx.rows === 4) {
-        const area = cv.contourArea(cnt);
-        if (area > maxArea) {
-          maxArea = area;
-          if (approxCurve) approxCurve.delete();
-          approxCurve = approx;
-        } else approx.delete();
-      } else approx.delete();
-    }
-
-    let dst = new cv.Mat();
-    if (approxCurve) {
-      let pts = [];
-      for (let i = 0; i < 4; i++)
-        pts.push({ x: approxCurve.intAt(i, 0), y: approxCurve.intAt(i, 1) });
-
-      pts.sort((a, b) => a.y - b.y);
-      const top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
-      const bottom = pts.slice(2, 4).sort((a, b) => a.x - b.x);
-      const ordered = [top[0], top[1], bottom[1], bottom[0]];
-
-      const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        ordered[0].x, ordered[0].y,
-        ordered[1].x, ordered[1].y,
-        ordered[2].x, ordered[2].y,
-        ordered[3].x, ordered[3].y,
-      ]);
-
-      const w = 1000, h = 600;
-      const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, w, 0, w, h, 0, h]);
-      const M = cv.getPerspectiveTransform(srcTri, dstTri);
-      cv.warpPerspective(src, dst, M, new cv.Size(w, h));
-
-      srcTri.delete(); dstTri.delete(); M.delete(); approxCurve.delete();
+    const file = e.target.files[0];
+    if (!file) return;
+    if (type === "front") {
+      setFrontFile(file);
+      setFrontPreview(URL.createObjectURL(file));
     } else {
-      const size = new cv.Size(1000, 600);
-      cv.resize(src, dst, size);
+      setBackFile(file);
+      setBackPreview(URL.createObjectURL(file));
     }
-
-    src.delete(); gray.delete(); blur.delete(); edges.delete(); contours.delete(); hierarchy.delete();
-    return dst;
   };
 
-  const processImages = async () => {
-    setError("");
+  const processCivilID = async () => {
     if (!frontFile || !backFile) {
-      setError("Upload both front and back images first.");
+      setError("Please upload both front and back images.");
       return;
     }
+    setError(null);
     setLoading(true);
 
     try {
-      const frontMat = await autoCropAndDeskew(frontFile);
-      const backMat = await autoCropAndDeskew(backFile);
+      const formData = new FormData();
+      formData.append("front", frontFile);
+      formData.append("back", backFile);
 
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext("2d");
+      const res = await fetch("https://civil-id-server.onrender.com", {
+        method: "POST",
+        body: formData,
+      });
 
-      // A4 at 300dpi
-      canvas.width = 2480;
-      canvas.height = 3508;
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const data = await res.json();
 
-      // Front top
-      let frontCanvas = document.createElement("canvas");
-      cv.imshow(frontCanvas, frontMat);
-      ctx.drawImage(frontCanvas, 240, 200, 2000, 1200);
-
-      // Back bottom
-      let backCanvas = document.createElement("canvas");
-      cv.imshow(backCanvas, backMat);
-      ctx.drawImage(backCanvas, 240, 200 + 1200 + 200, 2000, 1200);
-
-      // Watermark
-      if (watermark) {
-        ctx.save();
-        ctx.font = "80px Arial";
-        ctx.fillStyle = "rgba(150,150,150,0.15)";
-        ctx.textAlign = "center";
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate(-Math.PI / 6);
-        for (let y = -2000; y < 2000; y += 400) {
-          for (let x = -2000; x < 2000; x += 800) {
-            ctx.fillText(watermark, x, y);
-          }
-        }
-        ctx.restore();
+      if (data.error) {
+        setError(data.error);
+        setLoading(false);
+        return;
       }
 
-      setProcessed(true);
-    } catch (err) {
-      console.error(err);
-      setError("Failed to process Civil ID.");
-    } finally {
-      setLoading(false);
+      // Convert hex string back to blob
+      const frontBlob = new Blob([new Uint8Array(Buffer.from(data.front, "hex"))], { type: "image/jpeg" });
+      const backBlob = new Blob([new Uint8Array(Buffer.from(data.back, "hex"))], { type: "image/jpeg" });
+
+      setFrontPreview(URL.createObjectURL(frontBlob));
+      setBackPreview(URL.createObjectURL(backBlob));
+    } catch (e) {
+      setError("Failed to process Civil ID. Try again.");
+      console.error(e);
     }
+    setLoading(false);
   };
 
   const downloadPDF = () => {
-    const canvas = canvasRef.current;
     const pdf = new jsPDF("p", "pt", "a4");
-    const imgData = canvas.toDataURL("image/jpeg", 1.0);
-    pdf.addImage(imgData, "JPEG", 0, 0, 595, 842);
-    pdf.save("civil-id.pdf");
+    const canvas = canvasRef;
+    const ctx = canvas.getContext("2d");
+    const a4Width = 2480;
+    const a4Height = 3508;
+    canvas.width = a4Width;
+    canvas.height = a4Height;
+
+    // White background
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, a4Width, a4Height);
+
+    const drawImageOnCanvas = (img, yOffset) => {
+      const temp = document.createElement("canvas");
+      const tctx = temp.getContext("2d");
+      temp.width = img.width;
+      temp.height = img.height;
+      tctx.drawImage(img, 0, 0);
+      const targetWidth = 2000;
+      const targetHeight = 1200;
+      ctx.drawImage(temp, (a4Width - targetWidth)/2, yOffset, targetWidth, targetHeight);
+    };
+
+    const frontImg = new Image();
+    const backImg = new Image();
+    frontImg.src = frontPreview;
+    backImg.src = backPreview;
+
+    frontImg.onload = () => {
+      drawImageOnCanvas(frontImg, 200);
+      backImg.onload = () => {
+        drawImageOnCanvas(backImg, 200 + 1200 + 200);
+
+        // Add watermark if any
+        if (watermark) {
+          ctx.save();
+          ctx.font = "80px Arial";
+          ctx.fillStyle = "rgba(150,150,150,0.15)";
+          ctx.textAlign = "center";
+          ctx.translate(a4Width / 2, a4Height / 2);
+          ctx.rotate(-Math.PI / 6);
+          for (let y = -2000; y < 2000; y += 400) {
+            for (let x = -2000; x < 2000; x += 800) {
+              ctx.fillText(watermark, x, y);
+            }
+          }
+          ctx.restore();
+        }
+
+        const imgData = canvas.toDataURL("image/jpeg", 1.0);
+        pdf.addImage(imgData, "JPEG", 0, 0, 595, 842);
+        pdf.save("civil-id.pdf");
+      };
+    };
   };
 
   return (
@@ -176,37 +128,28 @@ export default function CivilIdPage() {
       <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30">
         <div>
           <label className="font-semibold text-blue-900">Upload Front Side:</label>
-          <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, "front")} className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full" />
+          <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, "front")} className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70" />
         </div>
         <div>
           <label className="font-semibold text-blue-900">Upload Back Side:</label>
-          <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, "back")} className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full" />
+          <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, "back")} className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70" />
         </div>
         <div>
           <label className="font-semibold text-blue-900">Optional Watermark:</label>
           <input type="text" placeholder="Enter watermark text" value={watermark} onChange={(e) => setWatermark(e.target.value)} className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full" />
         </div>
-
-        {error && <p className="text-red-600 font-medium">{error}</p>}
-
-        <button
-          onClick={processImages}
-          disabled={!cvReady || loading}
-          className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {loading && <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-          {loading ? "Processing Civil ID…" : cvReady ? "Process Civil ID" : "Loading OpenCV…"}
+        <button onClick={processCivilID} disabled={loading} className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300">
+          {loading ? "Processing Civil ID..." : "Process Civil ID"}
         </button>
+        {error && <p className="text-red-600 font-semibold">{error}</p>}
       </div>
 
-      {processed && (
-        <div className="mt-8 flex flex-col items-center gap-4">
+      {(frontPreview || backPreview) && (
+        <div className="mt-8 flex flex-col items-center gap-4 w-full max-w-xl">
           <h2 className="text-2xl font-semibold text-blue-900">Preview:</h2>
-          <canvas ref={canvasRef} className="border border-blue-300 shadow-md rounded-xl" />
-          <button
-            onClick={downloadPDF}
-            className="bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
-          >
+          {frontPreview && <img src={frontPreview} alt="Front" className="border border-blue-300 shadow-md rounded-xl" />}
+          {backPreview && <img src={backPreview} alt="Back" className="border border-blue-300 shadow-md rounded-xl" />}
+          <button onClick={downloadPDF} className="bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300">
             Download PDF
           </button>
         </div>

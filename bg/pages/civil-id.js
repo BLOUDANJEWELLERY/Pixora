@@ -70,51 +70,47 @@ const downloadPDF = () => {
   backImg.src = backPreview;
 
   frontImg.onload = () => {
-    // Calculate front image size maintaining aspect ratio
-    const frontMaxHeight = a4Height / 2 - margin * 2;
-    const frontRatio = frontImg.width / frontImg.height;
-    let frontHeight = frontMaxHeight;
-    let frontWidth = frontHeight * frontRatio;
-    if (frontWidth > a4Width - margin * 2) {
-      frontWidth = a4Width - margin * 2;
-      frontHeight = frontWidth / frontRatio;
-    }
-
-    const frontX = (a4Width - frontWidth) / 2;
-    const frontY = margin;
-
-    // Add subtle background rectangle for realism
-    pdf.setFillColor(245, 245, 245);
-    pdf.rect(margin / 2, margin / 2, a4Width - margin, a4Height - margin, "F");
-
-    pdf.addImage(frontImg, "JPEG", frontX, frontY, frontWidth, frontHeight);
-
     backImg.onload = () => {
-      // Calculate back image size maintaining aspect ratio
-      const backMaxHeight = a4Height / 2 - margin * 2;
-      const backRatio = backImg.width / backImg.height;
-      let backHeight = backMaxHeight;
+      // Calculate available height for both images with spacing
+      const availableHeight = a4Height - margin * 2;
+      const spacing = availableHeight * 0.1; // space between front and back
+      const maxImgHeight = (availableHeight - spacing) / 2 * 0.7; // reduce by 30%
+      
+      // Front image size
+      let frontRatio = frontImg.width / frontImg.height;
+      let frontHeight = maxImgHeight;
+      let frontWidth = frontHeight * frontRatio;
+      if (frontWidth > a4Width - margin * 2) {
+        frontWidth = a4Width - margin * 2;
+        frontHeight = frontWidth / frontRatio;
+      }
+      const frontX = (a4Width - frontWidth) / 2;
+      const frontY = margin + (availableHeight / 2 - frontHeight - spacing/2) / 2;
+
+      // Back image size
+      let backRatio = backImg.width / backImg.height;
+      let backHeight = maxImgHeight;
       let backWidth = backHeight * backRatio;
       if (backWidth > a4Width - margin * 2) {
         backWidth = a4Width - margin * 2;
         backHeight = backWidth / backRatio;
       }
-
       const backX = (a4Width - backWidth) / 2;
-      const backY = a4Height / 2 + margin;
+      const backY = frontY + frontHeight + spacing;
 
+      // White background
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, a4Width, a4Height, "F");
+
+      // Add images
+      pdf.addImage(frontImg, "JPEG", frontX, frontY, frontWidth, frontHeight);
       pdf.addImage(backImg, "JPEG", backX, backY, backWidth, backHeight);
 
-      // Add watermark if exists
+      // Watermark if any
       if (watermark) {
         pdf.setTextColor(180, 180, 180);
         pdf.setFontSize(50);
-        pdf.text(
-          watermark,
-          a4Width / 2,
-          a4Height / 2,
-          { align: "center", angle: -45 }
-        );
+        pdf.text(watermark, a4Width / 2, a4Height / 2, { align: "center", angle: -45 });
       }
 
       pdf.save("civil-id.pdf");

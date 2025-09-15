@@ -4,25 +4,22 @@ import jsPDF from "jspdf";
 import cv from "opencv.js"; // from npm
 
 export default function CivilIdPage() {
-  const [frontFile, setFrontFile] = useState<File | null>(null);
-  const [backFile, setBackFile] = useState<File | null>(null);
-  const [watermark, setWatermark] = useState<string>("");
-  const [processed, setProcessed] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(false);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [frontFile, setFrontFile] = useState(null);
+  const [backFile, setBackFile] = useState(null);
+  const [watermark, setWatermark] = useState("");
+  const [processed, setProcessed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const canvasRef = useRef(null);
 
   // Handle file upload
-  const handleFileChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    type: "front" | "back"
-  ) => {
+  const handleFileChange = (e, type) => {
     const file = e.target.files?.[0] || null;
     if (type === "front") setFrontFile(file);
     if (type === "back") setBackFile(file);
   };
 
   // Auto crop + deskew with OpenCV
-  const autoCropAndDeskew = async (file: File): Promise<cv.Mat> => {
+  const autoCropAndDeskew = async (file) => {
     const img = await createImageBitmap(file);
     const hidden = document.createElement("canvas");
     hidden.width = img.width;
@@ -40,16 +37,10 @@ export default function CivilIdPage() {
 
     const contours = new cv.MatVector();
     const hierarchy = new cv.Mat();
-    cv.findContours(
-      edges,
-      contours,
-      hierarchy,
-      cv.RETR_LIST,
-      cv.CHAIN_APPROX_SIMPLE
-    );
+    cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
 
     let maxArea = 0;
-    let approxCurve: cv.Mat | null = null;
+    let approxCurve = null;
 
     for (let i = 0; i < contours.size(); i++) {
       const cnt = contours.get(i);
@@ -73,39 +64,29 @@ export default function CivilIdPage() {
 
     const dst = new cv.Mat();
     if (approxCurve) {
-      const pts: { x: number; y: number }[] = [];
+      const pts = [];
       for (let i = 0; i < 4; i++) {
         pts.push({ x: approxCurve.intAt(i, 0), y: approxCurve.intAt(i, 1) });
       }
 
-      // sort corners
       pts.sort((a, b) => a.y - b.y);
       const top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
       const bottom = pts.slice(2, 4).sort((a, b) => a.x - b.x);
       const ordered = [top[0], top[1], bottom[1], bottom[0]];
 
       const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        ordered[0].x,
-        ordered[0].y,
-        ordered[1].x,
-        ordered[1].y,
-        ordered[2].x,
-        ordered[2].y,
-        ordered[3].x,
-        ordered[3].y,
+        ordered[0].x, ordered[0].y,
+        ordered[1].x, ordered[1].y,
+        ordered[2].x, ordered[2].y,
+        ordered[3].x, ordered[3].y,
       ]);
 
-      const w = 1000,
-        h = 600; // standardized ID size
+      const w = 1000, h = 600;
       const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        0,
-        0,
-        w,
-        0,
-        w,
-        h,
-        0,
-        h,
+        0, 0,
+        w, 0,
+        w, h,
+        0, h,
       ]);
 
       const M = cv.getPerspectiveTransform(srcTri, dstTri);
@@ -119,7 +100,6 @@ export default function CivilIdPage() {
       src.copyTo(dst);
     }
 
-    // cleanup
     src.delete();
     gray.delete();
     blur.delete();
@@ -142,26 +122,22 @@ export default function CivilIdPage() {
       const frontMat = await autoCropAndDeskew(frontFile);
       const backMat = await autoCropAndDeskew(backFile);
 
-      const canvas = canvasRef.current!;
-      const ctx = canvas.getContext("2d")!;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
 
-      // A4 size (300dpi)
       canvas.width = 2480;
       canvas.height = 3508;
       ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Front
       const frontCanvas = document.createElement("canvas");
       cv.imshow(frontCanvas, frontMat);
       ctx.drawImage(frontCanvas, 240, 200, 2000, 1200);
 
-      // Back
       const backCanvas = document.createElement("canvas");
       cv.imshow(backCanvas, backMat);
       ctx.drawImage(backCanvas, 240, 1600, 2000, 1200);
 
-      // Watermark
       if (watermark) {
         ctx.save();
         ctx.font = "80px Arial";
@@ -177,7 +153,6 @@ export default function CivilIdPage() {
         ctx.restore();
       }
 
-      // cleanup mats
       frontMat.delete();
       backMat.delete();
 
@@ -190,9 +165,8 @@ export default function CivilIdPage() {
     }
   };
 
-  // Download PDF
   const downloadPDF = () => {
-    const canvas = canvasRef.current!;
+    const canvas = canvasRef.current;
     const pdf = new jsPDF("p", "pt", "a4");
     const imgData = canvas.toDataURL("image/jpeg", 1.0);
     pdf.addImage(imgData, "JPEG", 0, 0, 595, 842);
@@ -204,7 +178,6 @@ export default function CivilIdPage() {
       <h1 className="text-4xl font-bold text-blue-900 mb-8">Civil ID Processor</h1>
 
       <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200">
-        {/* File Inputs */}
         <div>
           <label className="font-semibold text-blue-900">Upload Front Side:</label>
           <input
@@ -234,7 +207,6 @@ export default function CivilIdPage() {
           />
         </div>
 
-        {/* Process Button */}
         <button
           onClick={processImages}
           disabled={loading}
@@ -246,7 +218,6 @@ export default function CivilIdPage() {
         </button>
       </div>
 
-      {/* Preview + Download */}
       {processed && (
         <div className="mt-8 flex flex-col items-center gap-4">
           <h2 className="text-2xl font-semibold text-blue-900">Preview:</h2>

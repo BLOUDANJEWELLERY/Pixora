@@ -1,94 +1,131 @@
 "use client";
 import { useState, useRef } from "react";
 import jsPDF from "jspdf";
-import cv from "opencv.js"; // direct import from npm
+import cv from "opencv.js"; // from npm
 
 export default function CivilIdPage() {
   const [frontFile, setFrontFile] = useState<File | null>(null);
   const [backFile, setBackFile] = useState<File | null>(null);
-  const [watermark, setWatermark] = useState("");
-  const [processed, setProcessed] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [watermark, setWatermark] = useState<string>("");
+  const [processed, setProcessed] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Handle file upload
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: "front" | "back") => {
+  const handleFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: "front" | "back"
+  ) => {
     const file = e.target.files?.[0] || null;
     if (type === "front") setFrontFile(file);
     if (type === "back") setBackFile(file);
   };
 
   // Auto crop + deskew with OpenCV
-  const autoCropAndDeskew = async (file: File) => {
+  const autoCropAndDeskew = async (file: File): Promise<cv.Mat> => {
     const img = await createImageBitmap(file);
     const hidden = document.createElement("canvas");
     hidden.width = img.width;
     hidden.height = img.height;
     hidden.getContext("2d")?.drawImage(img, 0, 0);
 
-    let src = cv.imread(hidden);
-    let gray = new cv.Mat();
-    let blur = new cv.Mat();
-    let edges = new cv.Mat();
+    const src = cv.imread(hidden);
+    const gray = new cv.Mat();
+    const blur = new cv.Mat();
+    const edges = new cv.Mat();
 
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
     cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
     cv.Canny(blur, edges, 75, 200);
 
-    let contours = new cv.MatVector();
-    let hierarchy = new cv.Mat();
-    cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+    const contours = new cv.MatVector();
+    const hierarchy = new cv.Mat();
+    cv.findContours(
+      edges,
+      contours,
+      hierarchy,
+      cv.RETR_LIST,
+      cv.CHAIN_APPROX_SIMPLE
+    );
 
     let maxArea = 0;
-    let approxCurve: any = null;
+    let approxCurve: cv.Mat | null = null;
 
     for (let i = 0; i < contours.size(); i++) {
-      let cnt = contours.get(i);
-      let peri = cv.arcLength(cnt, true);
-      let approx = new cv.Mat();
+      const cnt = contours.get(i);
+      const peri = cv.arcLength(cnt, true);
+      const approx = new cv.Mat();
       cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
 
       if (approx.rows === 4) {
-        let area = cv.contourArea(cnt);
+        const area = cv.contourArea(cnt);
         if (area > maxArea) {
+          if (approxCurve) approxCurve.delete();
           maxArea = area;
           approxCurve = approx;
+        } else {
+          approx.delete();
         }
+      } else {
+        approx.delete();
       }
     }
 
-    let dst = new cv.Mat();
+    const dst = new cv.Mat();
     if (approxCurve) {
-      let pts = [];
+      const pts: { x: number; y: number }[] = [];
       for (let i = 0; i < 4; i++) {
         pts.push({ x: approxCurve.intAt(i, 0), y: approxCurve.intAt(i, 1) });
       }
 
-      pts = pts.sort((a, b) => a.y - b.y);
-      let top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
-      let bottom = pts.slice(2, 4).sort((a, b) => a.x - b.x);
-      let ordered = [top[0], top[1], bottom[1], bottom[0]];
+      // sort corners
+      pts.sort((a, b) => a.y - b.y);
+      const top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
+      const bottom = pts.slice(2, 4).sort((a, b) => a.x - b.x);
+      const ordered = [top[0], top[1], bottom[1], bottom[0]];
 
-      let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        ordered[0].x, ordered[0].y,
-        ordered[1].x, ordered[1].y,
-        ordered[2].x, ordered[2].y,
-        ordered[3].x, ordered[3].y
+      const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
+        ordered[0].x,
+        ordered[0].y,
+        ordered[1].x,
+        ordered[1].y,
+        ordered[2].x,
+        ordered[2].y,
+        ordered[3].x,
+        ordered[3].y,
       ]);
 
-      let w = 1000, h = 600;
-      let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        0, 0,
-        w, 0,
-        w, h,
-        0, h
+      const w = 1000,
+        h = 600; // standardized ID size
+      const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
+        0,
+        0,
+        w,
+        0,
+        w,
+        h,
+        0,
+        h,
       ]);
 
-      let M = cv.getPerspectiveTransform(srcTri, dstTri);
+      const M = cv.getPerspectiveTransform(srcTri, dstTri);
       cv.warpPerspective(src, dst, M, new cv.Size(w, h));
+
+      srcTri.delete();
+      dstTri.delete();
+      M.delete();
+      approxCurve.delete();
     } else {
-      dst = src.clone();
+      src.copyTo(dst);
     }
+
+    // cleanup
+    src.delete();
+    gray.delete();
+    blur.delete();
+    edges.delete();
+    contours.delete();
+    hierarchy.delete();
 
     return dst;
   };
@@ -108,20 +145,21 @@ export default function CivilIdPage() {
       const canvas = canvasRef.current!;
       const ctx = canvas.getContext("2d")!;
 
-      // A4 size (300dpi) canvas
+      // A4 size (300dpi)
       canvas.width = 2480;
       canvas.height = 3508;
       ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Draw processed front + back
-      let frontCanvas = document.createElement("canvas");
+      // Front
+      const frontCanvas = document.createElement("canvas");
       cv.imshow(frontCanvas, frontMat);
       ctx.drawImage(frontCanvas, 240, 200, 2000, 1200);
 
-      let backCanvas = document.createElement("canvas");
+      // Back
+      const backCanvas = document.createElement("canvas");
       cv.imshow(backCanvas, backMat);
-      ctx.drawImage(backCanvas, 240, 200 + 1200 + 200, 2000, 1200);
+      ctx.drawImage(backCanvas, 240, 1600, 2000, 1200);
 
       // Watermark
       if (watermark) {
@@ -138,6 +176,10 @@ export default function CivilIdPage() {
         }
         ctx.restore();
       }
+
+      // cleanup mats
+      frontMat.delete();
+      backMat.delete();
 
       setProcessed(true);
     } catch (err) {
@@ -165,22 +207,40 @@ export default function CivilIdPage() {
         {/* File Inputs */}
         <div>
           <label className="font-semibold text-blue-900">Upload Front Side:</label>
-          <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, "front")} className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70" />
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleFileChange(e, "front")}
+            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70"
+          />
         </div>
         <div>
           <label className="font-semibold text-blue-900">Upload Back Side:</label>
-          <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, "back")} className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70" />
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleFileChange(e, "back")}
+            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70"
+          />
         </div>
         <div>
           <label className="font-semibold text-blue-900">Optional Watermark:</label>
-          <input type="text" placeholder="Enter watermark text" value={watermark} onChange={(e) => setWatermark(e.target.value)} className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full" />
+          <input
+            type="text"
+            placeholder="Enter watermark text"
+            value={watermark}
+            onChange={(e) => setWatermark(e.target.value)}
+            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full"
+          />
         </div>
 
         {/* Process Button */}
         <button
           onClick={processImages}
           disabled={loading}
-          className={`bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl transition-all duration-300 ${loading ? "opacity-50 cursor-not-allowed" : "hover:scale-105"}`}
+          className={`bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl transition-all duration-300 ${
+            loading ? "opacity-50 cursor-not-allowed" : "hover:scale-105"
+          }`}
         >
           {loading ? "Processing Civil ID..." : "Process Civil ID"}
         </button>
@@ -190,8 +250,14 @@ export default function CivilIdPage() {
       {processed && (
         <div className="mt-8 flex flex-col items-center gap-4">
           <h2 className="text-2xl font-semibold text-blue-900">Preview:</h2>
-          <canvas ref={canvasRef} className="border border-blue-300 shadow-md rounded-xl" />
-          <button onClick={downloadPDF} className="bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300">
+          <canvas
+            ref={canvasRef}
+            className="border border-blue-300 shadow-md rounded-xl"
+          />
+          <button
+            onClick={downloadPDF}
+            className="bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
+          >
             Download PDF
           </button>
         </div>

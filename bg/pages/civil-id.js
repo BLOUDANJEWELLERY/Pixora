@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import jsPDF from "jspdf";
 
 export default function CivilIdPage() {
@@ -11,8 +11,9 @@ export default function CivilIdPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const canvasRef = document.createElement("canvas"); // hidden canvas
+  const canvasRef = useRef(null); // hidden canvas for PDF generation
 
+  // Handle file selection
   const handleFileChange = (e, type) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -25,11 +26,13 @@ export default function CivilIdPage() {
     }
   };
 
+  // Process Civil ID via server
   const processCivilID = async () => {
     if (!frontFile || !backFile) {
       setError("Please upload both front and back images.");
       return;
     }
+
     setError(null);
     setLoading(true);
 
@@ -43,37 +46,34 @@ export default function CivilIdPage() {
         body: formData,
       });
 
+      if (!res.ok) throw new Error("Server returned an error");
+
       const data = await res.json();
 
-      if (data.error) {
-        setError(data.error);
-        setLoading(false);
-        return;
-      }
-
-      // Convert hex string back to blob
-      const frontBlob = new Blob([new Uint8Array(Buffer.from(data.front, "hex"))], { type: "image/jpeg" });
-      const backBlob = new Blob([new Uint8Array(Buffer.from(data.back, "hex"))], { type: "image/jpeg" });
+      // Convert base64 to blob
+      const frontBlob = await (await fetch(`data:image/jpeg;base64,${data.front}`)).blob();
+      const backBlob = await (await fetch(`data:image/jpeg;base64,${data.back}`)).blob();
 
       setFrontPreview(URL.createObjectURL(frontBlob));
       setBackPreview(URL.createObjectURL(backBlob));
     } catch (e) {
-      setError("Failed to process Civil ID. Try again.");
       console.error(e);
+      setError("Failed to process Civil ID. Try again.");
     }
+
     setLoading(false);
   };
 
+  // Download PDF
   const downloadPDF = () => {
     const pdf = new jsPDF("p", "pt", "a4");
-    const canvas = canvasRef;
+    const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     const a4Width = 2480;
     const a4Height = 3508;
     canvas.width = a4Width;
     canvas.height = a4Height;
 
-    // White background
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, a4Width, a4Height);
 
@@ -85,7 +85,7 @@ export default function CivilIdPage() {
       tctx.drawImage(img, 0, 0);
       const targetWidth = 2000;
       const targetHeight = 1200;
-      ctx.drawImage(temp, (a4Width - targetWidth)/2, yOffset, targetWidth, targetHeight);
+      ctx.drawImage(temp, (a4Width - targetWidth) / 2, yOffset, targetWidth, targetHeight);
     };
 
     const frontImg = new Image();
@@ -98,7 +98,7 @@ export default function CivilIdPage() {
       backImg.onload = () => {
         drawImageOnCanvas(backImg, 200 + 1200 + 200);
 
-        // Add watermark if any
+        // Add watermark if provided
         if (watermark) {
           ctx.save();
           ctx.font = "80px Arial";
@@ -138,9 +138,12 @@ export default function CivilIdPage() {
           <label className="font-semibold text-blue-900">Optional Watermark:</label>
           <input type="text" placeholder="Enter watermark text" value={watermark} onChange={(e) => setWatermark(e.target.value)} className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full" />
         </div>
-        <button onClick={processCivilID} disabled={loading} className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300">
+
+        <button onClick={processCivilID} disabled={loading} className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 hover:shadow-lg transition-all duration-300">
           {loading ? "Processing Civil ID..." : "Process Civil ID"}
         </button>
+
+        {loading && <div className="mt-4 animate-spin border-4 border-blue-400 border-t-transparent rounded-full w-12 h-12"></div>}
         {error && <p className="text-red-600 font-semibold">{error}</p>}
       </div>
 
@@ -149,11 +152,13 @@ export default function CivilIdPage() {
           <h2 className="text-2xl font-semibold text-blue-900">Preview:</h2>
           {frontPreview && <img src={frontPreview} alt="Front" className="border border-blue-300 shadow-md rounded-xl" />}
           {backPreview && <img src={backPreview} alt="Back" className="border border-blue-300 shadow-md rounded-xl" />}
-          <button onClick={downloadPDF} className="bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300">
+          <button onClick={downloadPDF} className="bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow-xl hover:scale-105 hover:shadow-lg transition-all duration-300">
             Download PDF
           </button>
         </div>
       )}
+
+      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 }

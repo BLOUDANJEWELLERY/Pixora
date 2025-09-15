@@ -2,7 +2,7 @@
 import { useState, useCallback } from "react";
 import jsPDF from "jspdf";
 import Cropper from "react-easy-crop";
-import getCroppedImg from "./getCroppedImg"; // helper function, see below
+import getCroppedImg from "../components/getCroppedImg.js"; // helper function, see below
 
 export default function CivilIdPage() {
   const [frontFile, setFrontFile] = useState(null);

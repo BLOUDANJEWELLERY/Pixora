@@ -28,6 +28,7 @@ export default function CivilIdPage() {
       setError("Please upload both front and back images.");
       return;
     }
+
     setError(null);
     setLoading(true);
 
@@ -45,7 +46,7 @@ export default function CivilIdPage() {
 
       const data = await res.json();
 
-      // Convert base64 to URL object
+      // Decode base64 directly into image URLs
       setFrontPreview(`data:image/jpeg;base64,${data.front}`);
       setBackPreview(`data:image/jpeg;base64,${data.back}`);
     } catch (e) {
@@ -56,9 +57,12 @@ export default function CivilIdPage() {
   };
 
   const downloadPDF = () => {
+    if (!frontPreview || !backPreview) return;
+
     const pdf = new jsPDF("p", "pt", "a4");
     const a4Width = 595;
     const a4Height = 842;
+    const margin = 20;
 
     const frontImg = new Image();
     const backImg = new Image();
@@ -66,14 +70,43 @@ export default function CivilIdPage() {
     backImg.src = backPreview;
 
     frontImg.onload = () => {
-      pdf.addImage(frontImg, "JPEG", 0, 0, a4Width, 0.5 * a4Height);
-      backImg.onload = () => {
-        pdf.addImage(backImg, "JPEG", 0, 0.5 * a4Height, a4Width, 0.5 * a4Height);
+      // Fit front image to upper half
+      const frontRatio = frontImg.width / frontImg.height;
+      const frontHeight = (a4Height / 2) - margin * 2;
+      const frontWidth = frontHeight * frontRatio;
+      pdf.addImage(
+        frontImg,
+        "JPEG",
+        (a4Width - frontWidth) / 2,
+        margin,
+        frontWidth,
+        frontHeight
+      );
 
+      backImg.onload = () => {
+        // Fit back image to lower half
+        const backRatio = backImg.width / backImg.height;
+        const backHeight = (a4Height / 2) - margin * 2;
+        const backWidth = backHeight * backRatio;
+        pdf.addImage(
+          backImg,
+          "JPEG",
+          (a4Width - backWidth) / 2,
+          a4Height / 2 + margin,
+          backWidth,
+          backHeight
+        );
+
+        // Add watermark if exists
         if (watermark) {
-          pdf.setTextColor(200, 200, 200);
-          pdf.setFontSize(40);
-          pdf.text(watermark, a4Width/2, a4Height/2, { align: "center", angle: -45 });
+          pdf.setTextColor(150, 150, 150);
+          pdf.setFontSize(50);
+          pdf.text(
+            watermark,
+            a4Width / 2,
+            a4Height / 2,
+            { align: "center", angle: -45 }
+          );
         }
 
         pdf.save("civil-id.pdf");
@@ -88,17 +121,37 @@ export default function CivilIdPage() {
       <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30">
         <div>
           <label className="font-semibold text-blue-900">Upload Front Side:</label>
-          <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, "front")} className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70" />
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleFileChange(e, "front")}
+            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70"
+          />
         </div>
         <div>
           <label className="font-semibold text-blue-900">Upload Back Side:</label>
-          <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, "back")} className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70" />
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleFileChange(e, "back")}
+            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70"
+          />
         </div>
         <div>
           <label className="font-semibold text-blue-900">Optional Watermark:</label>
-          <input type="text" placeholder="Enter watermark text" value={watermark} onChange={(e) => setWatermark(e.target.value)} className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full" />
+          <input
+            type="text"
+            placeholder="Enter watermark text"
+            value={watermark}
+            onChange={(e) => setWatermark(e.target.value)}
+            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full"
+          />
         </div>
-        <button onClick={processCivilID} disabled={loading} className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300">
+        <button
+          onClick={processCivilID}
+          disabled={loading}
+          className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
+        >
           {loading ? "Processing Civil ID..." : "Process Civil ID"}
         </button>
         {error && <p className="text-red-600 font-semibold">{error}</p>}
@@ -109,7 +162,10 @@ export default function CivilIdPage() {
           <h2 className="text-2xl font-semibold text-blue-900">Preview:</h2>
           {frontPreview && <img src={frontPreview} alt="Front" className="border border-blue-300 shadow-md rounded-xl" />}
           {backPreview && <img src={backPreview} alt="Back" className="border border-blue-300 shadow-md rounded-xl" />}
-          <button onClick={downloadPDF} className="bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300">
+          <button
+            onClick={downloadPDF}
+            className="bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
+          >
             Download PDF
           </button>
         </div>

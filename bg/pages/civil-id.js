@@ -12,14 +12,19 @@ export default function CivilIdPage() {
   const [cvReady, setCvReady] = useState(false);
   const canvasRef = useRef(null);
 
-  // Wait for OpenCV.js from CDN
+  // Wait for OpenCV.js WASM fully initialized
   useEffect(() => {
-    const check = setInterval(() => {
-      if (typeof window !== "undefined" && window.cv && window.cv.imread) {
-        setCvReady(true);
-        clearInterval(check);
+    const waitForCV = () => {
+      if (window.cv) {
+        window.cv['onRuntimeInitialized'] = () => {
+          console.log("OpenCV.js ready ✅");
+          setCvReady(true);
+        };
+      } else {
+        setTimeout(waitForCV, 500);
       }
-    }, 500);
+    };
+    waitForCV();
   }, []);
 
   const handleFileChange = (e, type) => {
@@ -28,89 +33,95 @@ export default function CivilIdPage() {
     if (type === "back") setBackFile(file);
   };
 
-const autoCropAndDeskew = async (file) => {
-  try {
-    const img = await new Promise((resolve, reject) => {
-      const image = new Image();
-      image.src = URL.createObjectURL(file);
-      image.onload = () => resolve(image);
-      image.onerror = () => reject("Failed to load image");
+  const loadImage = (file) =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => resolve(img);
+      img.onerror = () => reject("Failed to load image");
     });
 
-    const hidden = document.createElement("canvas");
-    hidden.width = img.width;
-    hidden.height = img.height;
-    const ctx = hidden.getContext("2d");
-    ctx.drawImage(img, 0, 0);
+  const autoCropAndDeskew = async (file) => {
+    try {
+      const img = await loadImage(file);
 
-    let src = cv.imread(hidden);
-    let gray = new cv.Mat();
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-    let blur = new cv.Mat();
-    cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
-    let edges = new cv.Mat();
-    cv.Canny(blur, edges, 75, 200);
+      const hidden = document.createElement("canvas");
+      hidden.width = img.width;
+      hidden.height = img.height;
+      const ctx = hidden.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      document.body.appendChild(hidden); // required for cv.imread to work
+      let src = cv.imread(hidden);
+      document.body.removeChild(hidden);
 
-    let contours = new cv.MatVector();
-    let hierarchy = new cv.Mat();
-    cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+      let gray = new cv.Mat();
+      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+      let blur = new cv.Mat();
+      cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
+      let edges = new cv.Mat();
+      cv.Canny(blur, edges, 75, 200);
 
-    let maxArea = 0;
-    let approxCurve = null;
-    for (let i = 0; i < contours.size(); i++) {
-      const cnt = contours.get(i);
-      const peri = cv.arcLength(cnt, true);
-      const approx = new cv.Mat();
-      cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
-      if (approx.rows === 4) {
-        const area = cv.contourArea(cnt);
-        if (area > maxArea) {
-          maxArea = area;
-          if (approxCurve) approxCurve.delete();
-          approxCurve = approx;
+      let contours = new cv.MatVector();
+      let hierarchy = new cv.Mat();
+      cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+
+      let maxArea = 0;
+      let approxCurve = null;
+
+      for (let i = 0; i < contours.size(); i++) {
+        const cnt = contours.get(i);
+        const peri = cv.arcLength(cnt, true);
+        const approx = new cv.Mat();
+        cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+
+        if (approx.rows === 4) {
+          const area = cv.contourArea(cnt);
+          if (area > maxArea) {
+            maxArea = area;
+            if (approxCurve) approxCurve.delete();
+            approxCurve = approx;
+          } else approx.delete();
         } else approx.delete();
-      } else approx.delete();
+      }
+
+      let dst = new cv.Mat();
+      if (approxCurve) {
+        let pts = [];
+        for (let i = 0; i < 4; i++)
+          pts.push({ x: approxCurve.intAt(i, 0), y: approxCurve.intAt(i, 1) });
+
+        pts.sort((a, b) => a.y - b.y);
+        const top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
+        const bottom = pts.slice(2, 4).sort((a, b) => a.x - b.x);
+        const ordered = [top[0], top[1], bottom[1], bottom[0]];
+
+        const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
+          ordered[0].x, ordered[0].y,
+          ordered[1].x, ordered[1].y,
+          ordered[2].x, ordered[2].y,
+          ordered[3].x, ordered[3].y,
+        ]);
+
+        const w = 1000, h = 600;
+        const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, w, 0, w, h, 0, h]);
+        const M = cv.getPerspectiveTransform(srcTri, dstTri);
+        cv.warpPerspective(src, dst, M, new cv.Size(w, h));
+
+        srcTri.delete(); dstTri.delete(); M.delete(); approxCurve.delete();
+      } else {
+        // fallback
+        dst = new cv.Mat();
+        const size = new cv.Size(1000, 600);
+        cv.resize(src, dst, size);
+      }
+
+      src.delete(); gray.delete(); blur.delete(); edges.delete(); contours.delete(); hierarchy.delete();
+      return dst;
+    } catch (err) {
+      console.error("autoCropAndDeskew error:", err);
+      throw new Error("Failed to process this image");
     }
-
-    let dst = new cv.Mat();
-    if (approxCurve) {
-      // perspective transform
-      let pts = [];
-      for (let i = 0; i < 4; i++)
-        pts.push({ x: approxCurve.intAt(i, 0), y: approxCurve.intAt(i, 1) });
-
-      pts.sort((a, b) => a.y - b.y);
-      const top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
-      const bottom = pts.slice(2, 4).sort((a, b) => a.x - b.x);
-      const ordered = [top[0], top[1], bottom[1], bottom[0]];
-
-      const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        ordered[0].x, ordered[0].y,
-        ordered[1].x, ordered[1].y,
-        ordered[2].x, ordered[2].y,
-        ordered[3].x, ordered[3].y,
-      ]);
-
-      const w = 1000, h = 600;
-      const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, w, 0, w, h, 0, h]);
-      const M = cv.getPerspectiveTransform(srcTri, dstTri);
-      cv.warpPerspective(src, dst, M, new cv.Size(w, h));
-
-      srcTri.delete(); dstTri.delete(); M.delete(); approxCurve.delete();
-    } else {
-      // fallback if no rectangle detected
-      dst = new cv.Mat();
-      const size = new cv.Size(1000, 600);
-      cv.resize(src, dst, size);
-    }
-
-    src.delete(); gray.delete(); blur.delete(); edges.delete(); contours.delete(); hierarchy.delete();
-    return dst;
-  } catch (err) {
-    console.error("autoCropAndDeskew failed:", err);
-    throw new Error("Error processing image");
-  }
-};
+  };
 
   const processImages = async () => {
     setError("");
@@ -119,21 +130,21 @@ const autoCropAndDeskew = async (file) => {
       return;
     }
     if (!cvReady) {
-      setError("OpenCV is not ready yet. Please wait.");
+      setError("OpenCV is still loading, please wait a few seconds.");
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
       const frontMat = await autoCropAndDeskew(frontFile);
       const backMat = await autoCropAndDeskew(backFile);
 
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
 
+      // A4 size 300dpi
       canvas.width = 2480;
       canvas.height = 3508;
-
       ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -162,7 +173,7 @@ const autoCropAndDeskew = async (file) => {
 
       setProcessed(true);
     } catch (err) {
-      setError("Failed to process Civil ID.");
+      setError(err.message || "Failed to process Civil ID.");
     } finally {
       setLoading(false);
     }
@@ -199,8 +210,9 @@ const autoCropAndDeskew = async (file) => {
         <button
           onClick={processImages}
           disabled={!cvReady || loading}
-          className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50"
+          className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
         >
+          {loading && <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
           {loading ? "Processing Civil ID…" : cvReady ? "Process Civil ID" : "Loading OpenCV..."}
         </button>
       </div>

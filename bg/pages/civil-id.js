@@ -56,63 +56,71 @@ export default function CivilIdPage() {
     setLoading(false);
   };
 
-  const downloadPDF = () => {
-    if (!frontPreview || !backPreview) return;
+const downloadPDF = () => {
+  if (!frontPreview || !backPreview) return;
 
-    const pdf = new jsPDF("p", "pt", "a4");
-    const a4Width = 595;
-    const a4Height = 842;
-    const margin = 20;
+  const pdf = new jsPDF("p", "pt", "a4");
+  const a4Width = 595;   // pt
+  const a4Height = 842;  // pt
+  const margin = 20;
 
-    const frontImg = new Image();
-    const backImg = new Image();
-    frontImg.src = frontPreview;
-    backImg.src = backPreview;
+  const frontImg = new Image();
+  const backImg = new Image();
+  frontImg.src = frontPreview;
+  backImg.src = backPreview;
 
-    frontImg.onload = () => {
-      // Fit front image to upper half
-      const frontRatio = frontImg.width / frontImg.height;
-      const frontHeight = (a4Height / 2) - margin * 2;
-      const frontWidth = frontHeight * frontRatio;
-      pdf.addImage(
-        frontImg,
-        "JPEG",
-        (a4Width - frontWidth) / 2,
-        margin,
-        frontWidth,
-        frontHeight
-      );
+  frontImg.onload = () => {
+    // Calculate front image size maintaining aspect ratio
+    const frontMaxHeight = a4Height / 2 - margin * 2;
+    const frontRatio = frontImg.width / frontImg.height;
+    let frontHeight = frontMaxHeight;
+    let frontWidth = frontHeight * frontRatio;
+    if (frontWidth > a4Width - margin * 2) {
+      frontWidth = a4Width - margin * 2;
+      frontHeight = frontWidth / frontRatio;
+    }
 
-      backImg.onload = () => {
-        // Fit back image to lower half
-        const backRatio = backImg.width / backImg.height;
-        const backHeight = (a4Height / 2) - margin * 2;
-        const backWidth = backHeight * backRatio;
-        pdf.addImage(
-          backImg,
-          "JPEG",
-          (a4Width - backWidth) / 2,
-          a4Height / 2 + margin,
-          backWidth,
-          backHeight
+    const frontX = (a4Width - frontWidth) / 2;
+    const frontY = margin;
+
+    // Add subtle background rectangle for realism
+    pdf.setFillColor(245, 245, 245);
+    pdf.rect(margin / 2, margin / 2, a4Width - margin, a4Height - margin, "F");
+
+    pdf.addImage(frontImg, "JPEG", frontX, frontY, frontWidth, frontHeight);
+
+    backImg.onload = () => {
+      // Calculate back image size maintaining aspect ratio
+      const backMaxHeight = a4Height / 2 - margin * 2;
+      const backRatio = backImg.width / backImg.height;
+      let backHeight = backMaxHeight;
+      let backWidth = backHeight * backRatio;
+      if (backWidth > a4Width - margin * 2) {
+        backWidth = a4Width - margin * 2;
+        backHeight = backWidth / backRatio;
+      }
+
+      const backX = (a4Width - backWidth) / 2;
+      const backY = a4Height / 2 + margin;
+
+      pdf.addImage(backImg, "JPEG", backX, backY, backWidth, backHeight);
+
+      // Add watermark if exists
+      if (watermark) {
+        pdf.setTextColor(180, 180, 180);
+        pdf.setFontSize(50);
+        pdf.text(
+          watermark,
+          a4Width / 2,
+          a4Height / 2,
+          { align: "center", angle: -45 }
         );
+      }
 
-        // Add watermark if exists
-        if (watermark) {
-          pdf.setTextColor(150, 150, 150);
-          pdf.setFontSize(50);
-          pdf.text(
-            watermark,
-            a4Width / 2,
-            a4Height / 2,
-            { align: "center", angle: -45 }
-          );
-        }
-
-        pdf.save("civil-id.pdf");
-      };
+      pdf.save("civil-id.pdf");
     };
   };
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">

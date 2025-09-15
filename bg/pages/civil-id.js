@@ -1,31 +1,18 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+
+import { useState, useRef } from "react";
+import Script from "next/script";
 import jsPDF from "jspdf";
 
 export default function CivilIdPage() {
   const [frontFile, setFrontFile] = useState(null);
   const [backFile, setBackFile] = useState(null);
   const [watermark, setWatermark] = useState("");
-  const [processed, setProcessed] = useState(false);
+  const [cvReady, setCvReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [cvReady, setCvReady] = useState(false);
+  const [processed, setProcessed] = useState(false);
   const canvasRef = useRef(null);
-
-  // Wait for OpenCV.js WASM fully initialized
-  useEffect(() => {
-    const waitForCV = () => {
-      if (window.cv) {
-        window.cv['onRuntimeInitialized'] = () => {
-          console.log("OpenCV.js ready ✅");
-          setCvReady(true);
-        };
-      } else {
-        setTimeout(waitForCV, 500);
-      }
-    };
-    waitForCV();
-  }, []);
 
   const handleFileChange = (e, type) => {
     const file = e.target.files?.[0] || null;
@@ -50,7 +37,7 @@ export default function CivilIdPage() {
       hidden.height = img.height;
       const ctx = hidden.getContext("2d");
       ctx.drawImage(img, 0, 0);
-      document.body.appendChild(hidden); // required for cv.imread to work
+      document.body.appendChild(hidden); // required for cv.imread
       let src = cv.imread(hidden);
       document.body.removeChild(hidden);
 
@@ -109,7 +96,6 @@ export default function CivilIdPage() {
 
         srcTri.delete(); dstTri.delete(); M.delete(); approxCurve.delete();
       } else {
-        // fallback
         dst = new cv.Mat();
         const size = new cv.Size(1000, 600);
         cv.resize(src, dst, size);
@@ -189,6 +175,19 @@ export default function CivilIdPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
+      {/* Load OpenCV.js */}
+      <Script
+        src="https://docs.opencv.org/4.x/opencv.js"
+        strategy="afterInteractive"
+        onLoad={() => {
+          console.log("OpenCV.js loaded");
+          window.cv['onRuntimeInitialized'] = () => {
+            console.log("OpenCV WASM ready ✅");
+            setCvReady(true);
+          };
+        }}
+      />
+
       <h1 className="text-4xl font-bold text-blue-900 mb-8">Civil ID Processor</h1>
 
       <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30">

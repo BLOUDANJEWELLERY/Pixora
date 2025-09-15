@@ -1,69 +1,96 @@
 "use client";
-import { useState, useRef } from "react";
-import Draggable from "react-draggable";
+import { useState, useRef, useEffect } from "react";
 import jsPDF from "jspdf";
+import getPerspectiveCroppedImg from "../components/getPerspectiveCroppedImg.js"; // helper
 
 export default function CivilIdPage() {
-  const [frontFile, setFrontFile] = useState(null);
-  const [backFile, setBackFile] = useState(null);
   const [frontPreview, setFrontPreview] = useState(null);
   const [backPreview, setBackPreview] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [watermark, setWatermark] = useState("");
+  const [error, setError] = useState(null);
 
-  const [frontCorners, setFrontCorners] = useState([
-    { x: 50, y: 50 }, // tl
-    { x: 250, y: 50 }, // tr
-    { x: 250, y: 150 }, // br
-    { x: 50, y: 150 }, // bl
-  ]);
+  const [editing, setEditing] = useState(false);
+  const [editImage, setEditImage] = useState(null);
+  const [editPoints, setEditPoints] = useState([]); // [{x,y}, ...]
 
-  const [backCorners, setBackCorners] = useState([
-    { x: 50, y: 50 },
-    { x: 250, y: 50 },
-    { x: 250, y: 150 },
-    { x: 50, y: 150 },
-  ]);
+  const canvasRef = useRef(null);
+  const draggingPointIndex = useRef(null);
 
-  const frontImgRef = useRef();
-  const backImgRef = useRef();
-
-  const handleFileChange = (e, type) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    if (type === "front") {
-      setFrontFile(file);
-      setFrontPreview(url);
-    } else {
-      setBackFile(file);
-      setBackPreview(url);
-    }
+  const handleEdit = (image) => {
+    setEditImage(image);
+    // Default rectangle points with some margin
+    setEditPoints([
+      { x: 50, y: 50 },
+      { x: 350, y: 50 },
+      { x: 350, y: 200 },
+      { x: 50, y: 200 },
+    ]);
+    setEditing(true);
   };
 
-  const cropImage = (img, corners) => {
-    const canvas = document.createElement("canvas");
-    const width = Math.max(...corners.map(c => c.x)) - Math.min(...corners.map(c => c.x));
-    const height = Math.max(...corners.map(c => c.y)) - Math.min(...corners.map(c => c.y));
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
+  const handleMouseDown = (e) => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    editPoints.forEach((pt, idx) => {
+      if (Math.hypot(pt.x - x, pt.y - y) < 10) {
+        draggingPointIndex.current = idx;
+      }
+    });
+  };
 
-    const minX = Math.min(...corners.map(c => c.x));
-    const minY = Math.min(...corners.map(c => c.y));
+  const handleMouseMove = (e) => {
+    if (draggingPointIndex.current === null) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const newPoints = [...editPoints];
+    newPoints[draggingPointIndex.current] = { x, y };
+    setEditPoints(newPoints);
+  };
 
-    ctx.drawImage(
-      img,
-      minX,
-      minY,
-      width,
-      height,
-      0,
-      0,
-      width,
-      height
-    );
+  const handleMouseUp = () => {
+    draggingPointIndex.current = null;
+  };
 
-    return canvas.toDataURL("image/jpeg");
+  // Draw image + points
+  useEffect(() => {
+    if (!canvasRef.current || !editImage) return;
+    const ctx = canvasRef.current.getContext("2d");
+    const img = new Image();
+    img.src = editImage;
+    img.onload = () => {
+      canvasRef.current.width = img.width;
+      canvasRef.current.height = img.height;
+      ctx.clearRect(0, 0, img.width, img.height);
+      ctx.drawImage(img, 0, 0);
+      // draw polygon
+      ctx.strokeStyle = "red";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      editPoints.forEach((pt, idx) => {
+        if (idx === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      });
+      ctx.closePath();
+      ctx.stroke();
+      // draw points
+      editPoints.forEach((pt) => {
+        ctx.fillStyle = "blue";
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    };
+  }, [editPoints, editImage]);
+
+  const handleDoneEditing = async () => {
+    const cropped = await getPerspectiveCroppedImg(editImage, editPoints);
+    // Replace original image
+    if (editImage === frontPreview) setFrontPreview(cropped);
+    else if (editImage === backPreview) setBackPreview(cropped);
+    setEditing(false);
   };
 
   const downloadPDF = () => {
@@ -81,136 +108,92 @@ export default function CivilIdPage() {
 
     frontImg.onload = () => {
       backImg.onload = () => {
-        const croppedFront = cropImage(frontImg, frontCorners);
-        const croppedBack = cropImage(backImg, backCorners);
+        const availableHeight = a4Height - margin * 2;
+        const spacing = availableHeight * 0.1;
+        const maxImgHeight = (availableHeight - spacing) / 2 * 0.7;
 
-        const frontPDFImg = new Image();
-        const backPDFImg = new Image();
-        frontPDFImg.src = croppedFront;
-        backPDFImg.src = croppedBack;
+        // Front image size
+        let frontRatio = frontImg.width / frontImg.height;
+        let frontHeight = maxImgHeight;
+        let frontWidth = frontHeight * frontRatio;
+        if (frontWidth > a4Width - margin * 2) {
+          frontWidth = a4Width - margin * 2;
+          frontHeight = frontWidth / frontRatio;
+        }
+        const frontX = (a4Width - frontWidth) / 2;
+        const frontY = margin + (availableHeight / 2 - frontHeight - spacing / 2) / 2;
 
-        frontPDFImg.onload = () => {
-          backPDFImg.onload = () => {
-            const availableHeight = a4Height - margin * 2;
-            const spacing = availableHeight * 0.1;
-            const maxImgHeight = (availableHeight - spacing) / 2 * 0.7;
+        // Back image size
+        let backRatio = backImg.width / backImg.height;
+        let backHeight = maxImgHeight;
+        let backWidth = backHeight * backRatio;
+        if (backWidth > a4Width - margin * 2) {
+          backWidth = a4Width - margin * 2;
+          backHeight = backWidth / backRatio;
+        }
+        const backX = (a4Width - backWidth) / 2;
+        const backY = frontY + frontHeight + spacing;
 
-            let frontRatio = frontPDFImg.width / frontPDFImg.height;
-            let frontHeight = maxImgHeight;
-            let frontWidth = frontHeight * frontRatio;
-            if (frontWidth > a4Width - margin * 2) {
-              frontWidth = a4Width - margin * 2;
-              frontHeight = frontWidth / frontRatio;
-            }
-            const frontX = (a4Width - frontWidth) / 2;
-            const frontY = margin + (availableHeight / 2 - frontHeight - spacing / 2) / 2;
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(0, 0, a4Width, a4Height, "F");
 
-            let backRatio = backPDFImg.width / backPDFImg.height;
-            let backHeight = maxImgHeight;
-            let backWidth = backHeight * backRatio;
-            if (backWidth > a4Width - margin * 2) {
-              backWidth = a4Width - margin * 2;
-              backHeight = backWidth / backRatio;
-            }
-            const backX = (a4Width - backWidth) / 2;
-            const backY = frontY + frontHeight + spacing;
+        pdf.addImage(frontImg, "JPEG", frontX, frontY, frontWidth, frontHeight);
+        pdf.addImage(backImg, "JPEG", backX, backY, backWidth, backHeight);
 
-            pdf.setFillColor(255, 255, 255);
-            pdf.rect(0, 0, a4Width, a4Height, "F");
+        if (watermark) {
+          pdf.setTextColor(180, 180, 180);
+          pdf.setFontSize(50);
+          pdf.text(watermark, a4Width / 2, a4Height / 2, { align: "center", angle: -45 });
+        }
 
-            pdf.addImage(frontPDFImg, "JPEG", frontX, frontY, frontWidth, frontHeight);
-            pdf.addImage(backPDFImg, "JPEG", backX, backY, backWidth, backHeight);
-
-            if (watermark) {
-              pdf.setTextColor(180, 180, 180);
-              pdf.setFontSize(50);
-              pdf.text(watermark, a4Width / 2, a4Height / 2, { align: "center", angle: -45 });
-            }
-
-            pdf.save("civil-id.pdf");
-          };
-        };
+        pdf.save("civil-id.pdf");
       };
     };
-  };
-
-  const renderCorners = (corners, setCorners) => {
-    return corners.map((corner, i) => (
-      <Draggable
-        key={i}
-        bounds="parent"
-        position={{ x: corner.x, y: corner.y }}
-        onDrag={(e, data) => {
-          const newCorners = [...corners];
-          newCorners[i] = { x: data.x, y: data.y };
-          setCorners(newCorners);
-        }}
-      >
-        <div className="w-4 h-4 bg-red-500 rounded-full absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer z-10"></div>
-      </Draggable>
-    ));
   };
 
   return (
     <div className="min-h-screen bg-blue-50 flex flex-col items-center p-6">
       <h1 className="text-4xl font-bold text-blue-900 mb-8">Civil ID Processor</h1>
 
-      <div className="bg-white/40 shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30">
-        <div>
-          <label className="font-semibold text-blue-900">Upload Front Side:</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => handleFileChange(e, "front")}
-            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70"
-          />
-        </div>
-        <div>
-          <label className="font-semibold text-blue-900">Upload Back Side:</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => handleFileChange(e, "back")}
-            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70"
-          />
-        </div>
-        <div>
-          <label className="font-semibold text-blue-900">Optional Watermark:</label>
-          <input
-            type="text"
-            placeholder="Enter watermark text"
-            value={watermark}
-            onChange={(e) => setWatermark(e.target.value)}
-            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full"
-          />
-        </div>
-      </div>
-
       {frontPreview && (
-        <div className="mt-8 w-full max-w-xl relative">
-          <h2 className="text-2xl font-semibold text-blue-900 mb-2">Adjust Front Corners</h2>
-          <div className="relative w-full h-64 bg-gray-200 rounded-lg overflow-hidden">
-            <img ref={frontImgRef} src={frontPreview} alt="Front" className="w-full h-full object-contain" />
-            {renderCorners(frontCorners, setFrontCorners)}
-          </div>
+        <div className="flex flex-col gap-4 w-full max-w-xl">
+          <img src={frontPreview} alt="Front" className="border shadow rounded" />
+          <button onClick={() => handleEdit(frontPreview)} className="bg-blue-600 text-white py-2 px-4 rounded">
+            Edit Front
+          </button>
+        </div>
+      )}
+      {backPreview && (
+        <div className="flex flex-col gap-4 w-full max-w-xl mt-4">
+          <img src={backPreview} alt="Back" className="border shadow rounded" />
+          <button onClick={() => handleEdit(backPreview)} className="bg-blue-600 text-white py-2 px-4 rounded">
+            Edit Back
+          </button>
         </div>
       )}
 
-      {backPreview && (
-        <div className="mt-8 w-full max-w-xl relative">
-          <h2 className="text-2xl font-semibold text-blue-900 mb-2">Adjust Back Corners</h2>
-          <div className="relative w-full h-64 bg-gray-200 rounded-lg overflow-hidden">
-            <img ref={backImgRef} src={backPreview} alt="Back" className="w-full h-full object-contain" />
-            {renderCorners(backCorners, setBackCorners)}
+      {editing && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center z-50 p-4">
+          <canvas
+            ref={canvasRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            className="border bg-white"
+          />
+          <div className="mt-4 flex gap-4">
+            <button onClick={handleDoneEditing} className="bg-green-600 text-white px-4 py-2 rounded">
+              Done
+            </button>
+            <button onClick={() => setEditing(false)} className="bg-red-600 text-white px-4 py-2 rounded">
+              Cancel
+            </button>
           </div>
         </div>
       )}
 
       {(frontPreview || backPreview) && (
-        <button
-          onClick={downloadPDF}
-          className="mt-6 bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
-        >
+        <button onClick={downloadPDF} className="mt-6 bg-blue-700 text-white px-6 py-3 rounded shadow">
           Download PDF
         </button>
       )}

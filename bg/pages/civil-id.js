@@ -28,20 +28,27 @@ export default function CivilIdPage() {
     if (type === "back") setBackFile(file);
   };
 
-  const autoCropAndDeskew = async (file) => {
-    const img = await createImageBitmap(file);
+const autoCropAndDeskew = async (file) => {
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const image = new Image();
+      image.src = URL.createObjectURL(file);
+      image.onload = () => resolve(image);
+      image.onerror = () => reject("Failed to load image");
+    });
+
     const hidden = document.createElement("canvas");
     hidden.width = img.width;
     hidden.height = img.height;
-    hidden.getContext("2d").drawImage(img, 0, 0);
+    const ctx = hidden.getContext("2d");
+    ctx.drawImage(img, 0, 0);
 
     let src = cv.imread(hidden);
     let gray = new cv.Mat();
-    let blur = new cv.Mat();
-    let edges = new cv.Mat();
-
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+    let blur = new cv.Mat();
     cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
+    let edges = new cv.Mat();
     cv.Canny(blur, edges, 75, 200);
 
     let contours = new cv.MatVector();
@@ -50,57 +57,60 @@ export default function CivilIdPage() {
 
     let maxArea = 0;
     let approxCurve = null;
-
     for (let i = 0; i < contours.size(); i++) {
-      let cnt = contours.get(i);
-      let peri = cv.arcLength(cnt, true);
-      let approx = new cv.Mat();
+      const cnt = contours.get(i);
+      const peri = cv.arcLength(cnt, true);
+      const approx = new cv.Mat();
       cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
-
       if (approx.rows === 4) {
-        let area = cv.contourArea(cnt);
+        const area = cv.contourArea(cnt);
         if (area > maxArea) {
           maxArea = area;
+          if (approxCurve) approxCurve.delete();
           approxCurve = approx;
-        }
-      }
+        } else approx.delete();
+      } else approx.delete();
     }
 
     let dst = new cv.Mat();
     if (approxCurve) {
+      // perspective transform
       let pts = [];
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 4; i++)
         pts.push({ x: approxCurve.intAt(i, 0), y: approxCurve.intAt(i, 1) });
-      }
 
-      pts = pts.sort((a, b) => a.y - b.y);
-      let top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
-      let bottom = pts.slice(2, 4).sort((a, b) => a.x - b.x);
-      let ordered = [top[0], top[1], bottom[1], bottom[0]];
+      pts.sort((a, b) => a.y - b.y);
+      const top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
+      const bottom = pts.slice(2, 4).sort((a, b) => a.x - b.x);
+      const ordered = [top[0], top[1], bottom[1], bottom[0]];
 
-      let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
+      const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
         ordered[0].x, ordered[0].y,
         ordered[1].x, ordered[1].y,
         ordered[2].x, ordered[2].y,
         ordered[3].x, ordered[3].y,
       ]);
 
-      let w = 1000, h = 600;
-      let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        0, 0,
-        w, 0,
-        w, h,
-        0, h,
-      ]);
-
-      let M = cv.getPerspectiveTransform(srcTri, dstTri);
+      const w = 1000, h = 600;
+      const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, w, 0, w, h, 0, h]);
+      const M = cv.getPerspectiveTransform(srcTri, dstTri);
       cv.warpPerspective(src, dst, M, new cv.Size(w, h));
+
+      srcTri.delete(); dstTri.delete(); M.delete(); approxCurve.delete();
     } else {
-      dst = src.clone();
+      // fallback if no rectangle detected
+      dst = new cv.Mat();
+      const size = new cv.Size(1000, 600);
+      cv.resize(src, dst, size);
     }
 
+    src.delete(); gray.delete(); blur.delete(); edges.delete(); contours.delete(); hierarchy.delete();
     return dst;
-  };
+  } catch (err) {
+    console.error("autoCropAndDeskew failed:", err);
+    throw new Error("Error processing image");
+  }
+};
 
   const processImages = async () => {
     setError("");

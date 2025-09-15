@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
-import Script from "next/script";
+import { useState, useRef, useEffect } from "react";
 import jsPDF from "jspdf";
 
 export default function CivilIdPage() {
@@ -13,6 +12,33 @@ export default function CivilIdPage() {
   const [error, setError] = useState("");
   const [processed, setProcessed] = useState(false);
   const canvasRef = useRef(null);
+
+  // Load OpenCV.js dynamically from public folder
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "/opencv.js"; // local file in public folder
+    script.async = true;
+    script.onload = () => {
+      console.log("OpenCV.js loaded");
+      window.cv['onRuntimeInitialized'] = () => {
+        console.log("OpenCV WASM ready ✅");
+        setCvReady(true);
+      };
+    };
+    script.onerror = () => {
+      setError("Failed to load OpenCV.js");
+    };
+    document.body.appendChild(script);
+
+    const timeout = setTimeout(() => {
+      if (!cvReady) setError("OpenCV loading timeout. Please refresh the page.");
+    }, 20000); // 20s timeout
+
+    return () => {
+      document.body.removeChild(script);
+      clearTimeout(timeout);
+    };
+  }, []);
 
   const handleFileChange = (e, type) => {
     const file = e.target.files?.[0] || null;
@@ -37,7 +63,7 @@ export default function CivilIdPage() {
       hidden.height = img.height;
       const ctx = hidden.getContext("2d");
       ctx.drawImage(img, 0, 0);
-      document.body.appendChild(hidden); // required for cv.imread
+      document.body.appendChild(hidden); // needed for cv.imread
       let src = cv.imread(hidden);
       document.body.removeChild(hidden);
 
@@ -104,7 +130,7 @@ export default function CivilIdPage() {
       src.delete(); gray.delete(); blur.delete(); edges.delete(); contours.delete(); hierarchy.delete();
       return dst;
     } catch (err) {
-      console.error("autoCropAndDeskew error:", err);
+      console.error(err);
       throw new Error("Failed to process this image");
     }
   };
@@ -116,7 +142,7 @@ export default function CivilIdPage() {
       return;
     }
     if (!cvReady) {
-      setError("OpenCV is still loading, please wait a few seconds.");
+      setError("OpenCV is still loading, please wait.");
       return;
     }
 
@@ -128,7 +154,6 @@ export default function CivilIdPage() {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
 
-      // A4 size 300dpi
       canvas.width = 2480;
       canvas.height = 3508;
       ctx.fillStyle = "#fff";
@@ -175,19 +200,6 @@ export default function CivilIdPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
-      {/* Load OpenCV.js */}
-      <Script
-        src="https://docs.opencv.org/4.x/opencv.js"
-        strategy="afterInteractive"
-        onLoad={() => {
-          console.log("OpenCV.js loaded");
-          window.cv['onRuntimeInitialized'] = () => {
-            console.log("OpenCV WASM ready ✅");
-            setCvReady(true);
-          };
-        }}
-      />
-
       <h1 className="text-4xl font-bold text-blue-900 mb-8">Civil ID Processor</h1>
 
       <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30">
@@ -212,7 +224,7 @@ export default function CivilIdPage() {
           className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {loading && <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-          {loading ? "Processing Civil ID…" : cvReady ? "Process Civil ID" : "Loading OpenCV..."}
+          {loading ? "Processing Civil ID…" : cvReady ? "Process Civil ID" : "Loading OpenCV…"}
         </button>
       </div>
 

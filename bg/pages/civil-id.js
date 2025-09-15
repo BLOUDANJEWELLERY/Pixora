@@ -38,7 +38,7 @@ export default function CivilIdPage() {
       formData.append("front", frontFile);
       formData.append("back", backFile);
 
-      const res = await fetch("https://civil-id-server.onrender.com", {
+      const res = await fetch("https://civil-id-server.onrender.com/process-civil-id", {
         method: "POST",
         body: formData,
       });

@@ -7,6 +7,7 @@ export default function EdgeExtendBackground() {
   const [result, setResult] = useState<string | null>(null);
   const [padding, setPadding] = useState<number>(100);
   const [blur, setBlur] = useState<boolean>(false);
+  const [edgeSize, setEdgeSize] = useState<number>(50); // default edge strip
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -27,11 +28,22 @@ export default function EdgeExtendBackground() {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // Fill background with repeated edges
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Helper function to copy a strip from source
-      const copyStrip = (sx: number, sy: number, sw: number, sh: number, dx: number, dy: number, dw: number, dh: number) => {
+      // Limit edgeSize so it does not exceed image dimensions
+      const stripW = Math.min(edgeSize, img.width);
+      const stripH = Math.min(edgeSize, img.height);
+
+      const copyStrip = (
+        sx: number,
+        sy: number,
+        sw: number,
+        sh: number,
+        dx: number,
+        dy: number,
+        dw: number,
+        dh: number
+      ) => {
         const tempCanvas = document.createElement("canvas");
         tempCanvas.width = sw;
         tempCanvas.height = sh;
@@ -41,30 +53,35 @@ export default function EdgeExtendBackground() {
         ctx.drawImage(tempCanvas, 0, 0, sw, sh, dx, dy, dw, dh);
       };
 
-      const edgeWidth = Math.min(100, img.width);
-      const edgeHeight = Math.min(100, img.height);
+      // Top and bottom
+      copyStrip(0, 0, img.width, stripH, padding, 0, img.width, padding); // top
+      copyStrip(0, img.height - stripH, img.width, stripH, padding, canvas.height - padding, img.width, padding); // bottom
 
-      // Top
-      copyStrip(0, 0, img.width, edgeHeight, padding, 0, img.width, padding);
-      // Bottom
-      copyStrip(0, img.height - edgeHeight, img.width, edgeHeight, padding, canvas.height - padding, img.width, padding);
-      // Left
-      copyStrip(0, 0, edgeWidth, img.height, 0, padding, padding, img.height);
-      // Right
-      copyStrip(img.width - edgeWidth, 0, edgeWidth, img.height, canvas.width - padding, padding, padding, img.height);
+      // Left and right
+      copyStrip(0, 0, stripW, img.height, 0, padding, padding, img.height); // left
+      copyStrip(img.width - stripW, 0, stripW, img.height, canvas.width - padding, padding, padding, img.height); // right
+
       // Corners
-      copyStrip(0, 0, edgeWidth, edgeHeight, 0, 0, padding, padding); // top-left
-      copyStrip(img.width - edgeWidth, 0, edgeWidth, edgeHeight, canvas.width - padding, 0, padding, padding); // top-right
-      copyStrip(0, img.height - edgeHeight, edgeWidth, edgeHeight, 0, canvas.height - padding, padding, padding); // bottom-left
-      copyStrip(img.width - edgeWidth, img.height - edgeHeight, edgeWidth, edgeHeight, canvas.width - padding, canvas.height - padding, padding, padding); // bottom-right
+      copyStrip(0, 0, stripW, stripH, 0, 0, padding, padding); // top-left
+      copyStrip(img.width - stripW, 0, stripW, stripH, canvas.width - padding, 0, padding, padding); // top-right
+      copyStrip(0, img.height - stripH, stripW, stripH, 0, canvas.height - padding, padding, padding); // bottom-left
+      copyStrip(img.width - stripW, img.height - stripH, stripW, stripH, canvas.width - padding, canvas.height - padding, padding, padding); // bottom-right
 
-      // Draw main image in center
+      // Draw main image centered
       ctx.filter = blur ? "blur(10px)" : "none";
       ctx.drawImage(img, padding, padding);
 
       setResult(canvas.toDataURL("image/png"));
     };
-  }, [image, padding, blur]);
+  }, [image, padding, blur, edgeSize]);
+
+  const handleDownload = () => {
+    if (!result) return;
+    const link = document.createElement("a");
+    link.href = result;
+    link.download = "extended-image.png";
+    link.click();
+  };
 
   return (
     <div style={{ padding: "20px" }}>
@@ -89,6 +106,20 @@ export default function EdgeExtendBackground() {
 
           <div style={{ marginTop: "10px" }}>
             <label>
+              Edge strip size: {edgeSize}px
+              <input
+                type="range"
+                min={10}
+                max={Math.min(300, image ? Math.min(image.width, image.height) : 300)}
+                value={edgeSize}
+                onChange={(e) => setEdgeSize(parseInt(e.target.value))}
+                style={{ marginLeft: "10px", width: "300px" }}
+              />
+            </label>
+          </div>
+
+          <div style={{ marginTop: "10px" }}>
+            <label>
               <input
                 type="checkbox"
                 checked={blur}
@@ -98,6 +129,12 @@ export default function EdgeExtendBackground() {
               Blur background
             </label>
           </div>
+
+          {result && (
+            <button onClick={handleDownload} style={{ marginTop: "15px" }}>
+              Download Extended Image
+            </button>
+          )}
         </>
       )}
 

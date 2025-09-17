@@ -145,18 +145,6 @@ export default function EdgeExtendBackground() {
             </label>
           </div>
 
-          <div style={{ marginTop: "10px" }}>
-            <label>
-              <input
-                type="checkbox"
-                checked={blur}
-                onChange={() => setBlur(!blur)}
-                style={{ marginRight: "5px" }}
-              />
-              Blur background
-            </label>
-          </div>
-
           {result && (
             <button onClick={handleDownload} style={{ marginTop: "15px" }}>
               Download Extended Image

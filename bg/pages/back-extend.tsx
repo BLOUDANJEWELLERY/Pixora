@@ -19,47 +19,46 @@ export default function EdgeExtendBackground() {
   };
 
   useEffect(() => {
-    if (!imageFile || !canvasRef.current) return;
+  if (!imageFile || !canvasRef.current) return;
 
-    const img = new Image();
-    img.src = URL.createObjectURL(imageFile);
+  const canvas = canvasRef.current;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return; // Guard against null context
 
-    img.onload = () => {
-      setImgDimensions({ width: img.width, height: img.height });
+  const img = new Image();
+  img.src = URL.createObjectURL(imageFile);
+  img.onload = () => {
+    setImgDimensions({ width: img.width, height: img.height });
 
-      const canvas = canvasRef.current;
-      canvas.width = img.width + padding * 2;
-      canvas.height = img.height + padding * 2;
+    // Safe canvas assignment
+    canvas.width = img.width + padding * 2;
+    canvas.height = img.height + padding * 2;
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const stripW = Math.min(edgeSize, img.width);
+    const stripH = Math.min(edgeSize, img.height);
 
-      const stripW = Math.min(edgeSize, img.width);
-      const stripH = Math.min(edgeSize, img.height);
+    const copyStrip = (
+      sx: number,
+      sy: number,
+      sw: number,
+      sh: number,
+      dx: number,
+      dy: number,
+      dw: number,
+      dh: number
+    ) => {
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = sw;
+      tempCanvas.height = sh;
+      const tctx = tempCanvas.getContext("2d");
+      if (!tctx) return;
+      tctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+      ctx.drawImage(tempCanvas, 0, 0, sw, sh, dx, dy, dw, dh);
+    };
 
-      const copyStrip = (
-        sx: number,
-        sy: number,
-        sw: number,
-        sh: number,
-        dx: number,
-        dy: number,
-        dw: number,
-        dh: number
-      ) => {
-        const tempCanvas = document.createElement("canvas");
-        tempCanvas.width = sw;
-        tempCanvas.height = sh;
-        const tctx = tempCanvas.getContext("2d");
-        if (!tctx) return;
-        tctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-        ctx.drawImage(tempCanvas, 0, 0, sw, sh, dx, dy, dw, dh);
-      };
-
-      // Apply blur to background edges if selected
-      ctx.filter = blur ? "blur(10px)" : "none";
+    ctx.filter = blur ? "blur(10px)" : "none";
 
       // Top and bottom
       copyStrip(0, 0, img.width, stripH, padding, 0, img.width, padding); // top

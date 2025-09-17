@@ -212,7 +212,7 @@ export default function EdgeExtendBackground() {
               </label>
               <input
                 type="range"
-                min={10}
+                min={1}
                 max={1000}
                 value={padding}
                 onChange={(e) => setPadding(+e.target.value)}

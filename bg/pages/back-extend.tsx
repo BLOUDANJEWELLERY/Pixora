@@ -8,7 +8,7 @@ export default function EdgeExtendBackground() {
   const [result, setResult] = useState<string | null>(null);
   const [padding, setPadding] = useState<number>(100);
   const [blur, setBlur] = useState<boolean>(false);
-  const [edgeSize, setEdgeSize] = useState<number>(50); // default edge strip
+  const [edgeSize, setEdgeSize] = useState<number>(50);
   const [edgePreview, setEdgePreview] = useState<string | null>(null);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,6 +22,7 @@ export default function EdgeExtendBackground() {
 
     const img = new Image();
     img.src = URL.createObjectURL(imageFile);
+
     img.onload = () => {
       setImgDimensions({ width: img.width, height: img.height });
 
@@ -55,27 +56,30 @@ export default function EdgeExtendBackground() {
         ctx.drawImage(tempCanvas, 0, 0, sw, sh, dx, dy, dw, dh);
       };
 
-      // Top and bottom
+      // Apply blur for background edges if selected
+      ctx.filter = blur ? "blur(10px)" : "none";
+
+      // Draw Top and bottom
       copyStrip(0, 0, img.width, stripH, padding, 0, img.width, padding); // top
       copyStrip(0, img.height - stripH, img.width, stripH, padding, canvas.height - padding, img.width, padding); // bottom
 
-      // Left and right
-      copyStrip(0, 0, stripW, img.height, 0, padding, padding, img.height); // left
-      copyStrip(img.width - stripW, 0, stripW, img.height, canvas.width - padding, padding, padding, img.height); // right
+      // Draw Left and right
+      copyStrip(0, 0, stripW, img.height, 0, padding, stripW, img.height); // left
+      copyStrip(img.width - stripW, 0, stripW, img.height, canvas.width - padding, padding, stripW, img.height); // right
 
-      // Corners
-      copyStrip(0, 0, stripW, stripH, 0, 0, padding, padding); // top-left
-      copyStrip(img.width - stripW, 0, stripW, stripH, canvas.width - padding, 0, padding, padding); // top-right
-      copyStrip(0, img.height - stripH, stripW, stripH, 0, canvas.height - padding, padding, padding); // bottom-left
-      copyStrip(img.width - stripW, img.height - stripH, stripW, stripH, canvas.width - padding, canvas.height - padding, padding, padding); // bottom-right
+      // Draw corners
+      copyStrip(0, 0, stripW, stripH, 0, 0, stripW, stripH); // top-left
+      copyStrip(img.width - stripW, 0, stripW, stripH, canvas.width - padding, 0, stripW, stripH); // top-right
+      copyStrip(0, img.height - stripH, stripW, stripH, 0, canvas.height - padding, stripW, stripH); // bottom-left
+      copyStrip(img.width - stripW, img.height - stripH, stripW, stripH, canvas.width - padding, canvas.height - padding, stripW, stripH); // bottom-right
 
-      // Draw main image centered
-      ctx.filter = blur ? "blur(10px)" : "none";
+      // Reset filter for main image so it stays sharp
+      ctx.filter = "none";
       ctx.drawImage(img, padding, padding);
 
       setResult(canvas.toDataURL("image/png"));
 
-      // Edge strip preview
+      // Edge strip preview (always unblurred for clarity)
       const edgeCanvas = document.createElement("canvas");
       edgeCanvas.width = img.width + 2 * stripW;
       edgeCanvas.height = img.height + 2 * stripH;

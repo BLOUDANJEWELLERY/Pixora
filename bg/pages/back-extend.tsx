@@ -238,16 +238,6 @@ export default function EdgeExtendBackground() {
               />
             </div>
 
-            <label className="flex items-center gap-2 text-blue-900 font-semibold">
-              <input
-                type="checkbox"
-                checked={blur}
-                onChange={() => setBlur(!blur)}
-                className="accent-blue-600"
-              />
-              Blur Background
-            </label>
-
             {/* Export Options */}
             <div>
               <label className="font-semibold text-blue-900">Export Format:</label>

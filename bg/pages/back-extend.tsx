@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 export default function EdgeExtendBackground() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imgDimensions, setImgDimensions] = useState<{ width: number; height: number } | null>(null);
-  const [result, setResult] = useState<string | null>(null);
   const [padding, setPadding] = useState<number>(100);
   const [blur, setBlur] = useState<boolean>(false);
   const [edgeSize, setEdgeSize] = useState<number>(50);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const edgeCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -18,77 +18,83 @@ export default function EdgeExtendBackground() {
     }
   };
 
-  useEffect(() => {
-  if (!imageFile || !canvasRef.current) return;
-
-  const canvas = canvasRef.current;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return; // Guard against null context
-
-  const img = new Image();
-  img.src = URL.createObjectURL(imageFile);
-  img.onload = () => {
-    setImgDimensions({ width: img.width, height: img.height });
-
-    // Safe canvas assignment
-    canvas.width = img.width + padding * 2;
-    canvas.height = img.height + padding * 2;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const stripW = Math.min(edgeSize, img.width);
-    const stripH = Math.min(edgeSize, img.height);
-
-    const copyStrip = (
-      sx: number,
-      sy: number,
-      sw: number,
-      sh: number,
-      dx: number,
-      dy: number,
-      dw: number,
-      dh: number
-    ) => {
-      const tempCanvas = document.createElement("canvas");
-      tempCanvas.width = sw;
-      tempCanvas.height = sh;
-      const tctx = tempCanvas.getContext("2d");
-      if (!tctx) return;
-      tctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-      ctx.drawImage(tempCanvas, 0, 0, sw, sh, dx, dy, dw, dh);
-    };
-
-    ctx.filter = blur ? "blur(10px)" : "none";
-
-      // Top and bottom
-      copyStrip(0, 0, img.width, stripH, padding, 0, img.width, padding); // top
-      copyStrip(0, img.height - stripH, img.width, stripH, padding, canvas.height - padding, img.width, padding); // bottom
-
-      // Left and right
-      copyStrip(0, 0, stripW, img.height, 0, padding, stripW, img.height); // left
-      copyStrip(img.width - stripW, 0, stripW, img.height, canvas.width - padding, padding, stripW, img.height); // right
-
-      // Corners
-      copyStrip(0, 0, stripW, stripH, 0, 0, stripW, stripH); // top-left
-      copyStrip(img.width - stripW, 0, stripW, stripH, canvas.width - padding, 0, stripW, stripH); // top-right
-      copyStrip(0, img.height - stripH, stripW, stripH, 0, canvas.height - padding, stripW, stripH); // bottom-left
-      copyStrip(img.width - stripW, img.height - stripH, stripW, stripH, canvas.width - padding, canvas.height - padding, stripW, stripH); // bottom-right
-
-      // Reset filter for main image
-      ctx.filter = "none";
-      ctx.drawImage(img, padding, padding);
-
-      setResult(canvas.toDataURL("image/png"));
-    };
-  }, [imageFile, padding, blur, edgeSize]);
-
   const handleDownload = () => {
-    if (!result) return;
+    if (!canvasRef.current) return;
     const link = document.createElement("a");
-    link.href = result;
+    link.href = canvasRef.current.toDataURL("image/png");
     link.download = "extended-image.png";
     link.click();
   };
+
+  useEffect(() => {
+    if (!imageFile || !canvasRef.current || !edgeCanvasRef.current) return;
+
+    const img = new Image();
+    img.src = URL.createObjectURL(imageFile);
+
+    img.onload = () => {
+      setImgDimensions({ width: img.width, height: img.height });
+
+      // ---- Main Extended Canvas ----
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      canvas.width = img.width + padding * 2;
+      canvas.height = img.height + padding * 2;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const stripW = Math.min(edgeSize, img.width);
+      const stripH = Math.min(edgeSize, img.height);
+
+      const copyStrip = (sx: number, sy: number, sw: number, sh: number, dx: number, dy: number, dw: number, dh: number) => {
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = sw;
+        tempCanvas.height = sh;
+        const tctx = tempCanvas.getContext("2d");
+        if (!tctx) return;
+        tctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+        ctx.drawImage(tempCanvas, 0, 0, sw, sh, dx, dy, dw, dh);
+      };
+
+      // Top & Bottom
+      copyStrip(0, 0, img.width, stripH, padding, 0, img.width, padding); // top
+      copyStrip(0, img.height - stripH, img.width, stripH, padding, canvas.height - padding, img.width, padding); // bottom
+
+      // Left & Right
+      copyStrip(0, 0, stripW, img.height, 0, padding, padding, img.height); // left
+      copyStrip(img.width - stripW, 0, stripW, img.height, canvas.width - padding, padding, padding, img.height); // right
+
+      // Corners
+      copyStrip(0, 0, stripW, stripH, 0, 0, padding, padding); // top-left
+      copyStrip(img.width - stripW, 0, stripW, stripH, canvas.width - padding, 0, padding, padding); // top-right
+      copyStrip(0, img.height - stripH, stripW, stripH, 0, canvas.height - padding, padding, padding); // bottom-left
+      copyStrip(img.width - stripW, img.height - stripH, stripW, stripH, canvas.width - padding, canvas.height - padding, padding, padding); // bottom-right
+
+      ctx.filter = blur ? "blur(10px)" : "none";
+      ctx.drawImage(img, padding, padding);
+
+      // ---- Edge Strip Canvas Preview ----
+      const edgeCanvas = edgeCanvasRef.current;
+      const edgeCtx = edgeCanvas.getContext("2d");
+      if (!edgeCtx) return;
+
+      edgeCanvas.width = img.width + 2 * stripW;
+      edgeCanvas.height = img.height + 2 * stripH;
+      edgeCtx.clearRect(0, 0, edgeCanvas.width, edgeCanvas.height);
+
+      // Top, Bottom, Left, Right & Corners
+      edgeCtx.drawImage(img, 0, 0, img.width, stripH, stripW, 0, img.width, stripH);
+      edgeCtx.drawImage(img, 0, img.height - stripH, img.width, stripH, stripW, edgeCanvas.height - stripH, img.width, stripH);
+      edgeCtx.drawImage(img, 0, 0, stripW, img.height, 0, stripH, stripW, img.height);
+      edgeCtx.drawImage(img, img.width - stripW, 0, stripW, img.height, edgeCanvas.width - stripW, stripH, stripW, img.height);
+      edgeCtx.drawImage(img, 0, 0, stripW, stripH, 0, 0, stripW, stripH);
+      edgeCtx.drawImage(img, img.width - stripW, 0, stripW, stripH, edgeCanvas.width - stripW, 0, stripW, stripH);
+      edgeCtx.drawImage(img, 0, img.height - stripH, stripW, stripH, 0, edgeCanvas.height - stripH, stripW, stripH);
+      edgeCtx.drawImage(img, img.width - stripW, img.height - stripH, stripW, stripH, edgeCanvas.width - stripW, edgeCanvas.height - stripH, stripW, stripH);
+    };
+  }, [imageFile, padding, blur, edgeSize]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6 animate-fadeIn">
@@ -96,6 +102,7 @@ export default function EdgeExtendBackground() {
         Edge Repeated Background Extender
       </h1>
 
+      {/* Glassmorphic Upload Card */}
       <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30 transition-transform transform hover:scale-[1.02] duration-300">
         <div className="flex flex-col">
           <label className="mb-2 font-semibold text-blue-900">Upload Image:</label>
@@ -138,9 +145,9 @@ export default function EdgeExtendBackground() {
                 type="checkbox"
                 checked={blur}
                 onChange={() => setBlur(!blur)}
-                className="w-4 h-4 accent-blue-500"
+                className="accent-blue-600"
               />
-              <span className="font-semibold text-blue-900">Blur Background</span>
+              <span className="text-blue-900 font-semibold">Blur Background</span>
             </div>
 
             <button
@@ -153,10 +160,18 @@ export default function EdgeExtendBackground() {
         )}
       </div>
 
-      {result && (
-        <div className="mt-10 bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-6 w-full max-w-xl flex flex-col items-center gap-4 border border-blue-200 border-opacity-30 animate-fadeIn">
-          <h2 className="text-2xl md:text-3xl font-semibold text-blue-900 drop-shadow-sm">Live Preview:</h2>
-          <canvas ref={canvasRef} className="rounded-2xl border border-blue-300 max-w-full shadow-md" />
+      {/* Preview Cards */}
+      {imageFile && (
+        <div className="mt-10 flex flex-col items-center gap-6 w-full max-w-xl">
+          <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-6 flex flex-col items-center gap-4 border border-blue-200 border-opacity-30">
+            <h2 className="text-2xl md:text-3xl font-semibold text-blue-900 drop-shadow-sm">Live Preview</h2>
+            <canvas ref={canvasRef} className="rounded-2xl border border-blue-300 max-w-full shadow-md" />
+          </div>
+
+          <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-6 flex flex-col items-center gap-4 border border-blue-200 border-opacity-30">
+            <h2 className="text-2xl md:text-3xl font-semibold text-blue-900 drop-shadow-sm">Edge Strip Preview</h2>
+            <canvas ref={edgeCanvasRef} className="rounded-2xl border border-blue-300 max-w-full shadow-md" />
+          </div>
         </div>
       )}
 

@@ -27,46 +27,40 @@ export default function EdgeExtendBackground() {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // Optionally blur the whole canvas first
-      if (blur) ctx.filter = "blur(10px)";
+      // Fill background with repeated edges
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Fill extended background with repeated edges
-      // Draw main image centered
-      ctx.filter = blur ? "blur(10px)" : "none"; // main image stays sharp if no blur
+      // Helper function to copy a strip from source
+      const copyStrip = (sx: number, sy: number, sw: number, sh: number, dx: number, dy: number, dw: number, dh: number) => {
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = sw;
+        tempCanvas.height = sh;
+        const tctx = tempCanvas.getContext("2d");
+        if (!tctx) return;
+        tctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+        ctx.drawImage(tempCanvas, 0, 0, sw, sh, dx, dy, dw, dh);
+      };
+
+      const edgeWidth = Math.min(100, img.width);
+      const edgeHeight = Math.min(100, img.height);
+
+      // Top
+      copyStrip(0, 0, img.width, edgeHeight, padding, 0, img.width, padding);
+      // Bottom
+      copyStrip(0, img.height - edgeHeight, img.width, edgeHeight, padding, canvas.height - padding, img.width, padding);
+      // Left
+      copyStrip(0, 0, edgeWidth, img.height, 0, padding, padding, img.height);
+      // Right
+      copyStrip(img.width - edgeWidth, 0, edgeWidth, img.height, canvas.width - padding, padding, padding, img.height);
+      // Corners
+      copyStrip(0, 0, edgeWidth, edgeHeight, 0, 0, padding, padding); // top-left
+      copyStrip(img.width - edgeWidth, 0, edgeWidth, edgeHeight, canvas.width - padding, 0, padding, padding); // top-right
+      copyStrip(0, img.height - edgeHeight, edgeWidth, edgeHeight, 0, canvas.height - padding, padding, padding); // bottom-left
+      copyStrip(img.width - edgeWidth, img.height - edgeHeight, edgeWidth, edgeHeight, canvas.width - padding, canvas.height - padding, padding, padding); // bottom-right
+
+      // Draw main image in center
+      ctx.filter = blur ? "blur(10px)" : "none";
       ctx.drawImage(img, padding, padding);
-
-      // Repeat top and bottom edges
-      const topEdge = ctx.getImageData(padding, padding, img.width, 1);
-      const bottomEdge = ctx.getImageData(padding, padding + img.height - 1, img.width, 1);
-
-      for (let y = 0; y < padding; y++) {
-        ctx.putImageData(topEdge, padding, y);
-        ctx.putImageData(bottomEdge, padding, canvas.height - padding + y);
-      }
-
-      // Repeat left and right edges
-      const leftEdge = ctx.getImageData(padding, padding, 1, img.height);
-      const rightEdge = ctx.getImageData(padding + img.width - 1, padding, 1, img.height);
-
-      for (let x = 0; x < padding; x++) {
-        ctx.putImageData(leftEdge, x, padding);
-        ctx.putImageData(rightEdge, canvas.width - padding + x, padding);
-      }
-
-      // Fill corners
-      const topLeft = ctx.getImageData(padding, padding, 1, 1);
-      const topRight = ctx.getImageData(padding + img.width - 1, padding, 1, 1);
-      const bottomLeft = ctx.getImageData(padding, padding + img.height - 1, 1, 1);
-      const bottomRight = ctx.getImageData(padding + img.width - 1, padding + img.height - 1, 1, 1);
-
-      for (let x = 0; x < padding; x++) {
-        for (let y = 0; y < padding; y++) {
-          ctx.putImageData(topLeft, x, y);
-          ctx.putImageData(topRight, canvas.width - padding + x, y);
-          ctx.putImageData(bottomLeft, x, canvas.height - padding + y);
-          ctx.putImageData(bottomRight, canvas.width - padding + x, canvas.height - padding + y);
-        }
-      }
 
       setResult(canvas.toDataURL("image/png"));
     };
@@ -85,10 +79,10 @@ export default function EdgeExtendBackground() {
               <input
                 type="range"
                 min={10}
-                max={300}
+                max={1000}
                 value={padding}
                 onChange={(e) => setPadding(parseInt(e.target.value))}
-                style={{ marginLeft: "10px" }}
+                style={{ marginLeft: "10px", width: "300px" }}
               />
             </label>
           </div>

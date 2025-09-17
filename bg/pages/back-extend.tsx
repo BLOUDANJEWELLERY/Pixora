@@ -212,7 +212,7 @@ export default function EdgeExtendBackground() {
               </label>
               <input
                 type="range"
-                min={1}
+                min={10}
                 max={1000}
                 value={padding}
                 onChange={(e) => setPadding(+e.target.value)}
@@ -226,7 +226,7 @@ export default function EdgeExtendBackground() {
               </label>
               <input
                 type="range"
-                min={10}
+                min={1}
                 max={
                   imgDimensions
                     ? Math.min(300, Math.min(imgDimensions.width, imgDimensions.height))

@@ -8,6 +8,7 @@ export default function EdgeExtendBackground() {
   const [padding, setPadding] = useState<number>(100);
   const [blur, setBlur] = useState<boolean>(false);
   const [edgeSize, setEdgeSize] = useState<number>(50); // default edge strip
+  const [edgePreview, setEdgePreview] = useState<string | null>(null);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -72,6 +73,30 @@ export default function EdgeExtendBackground() {
       ctx.drawImage(img, padding, padding);
 
       setResult(canvas.toDataURL("image/png"));
+
+      // Create edge preview (just the strips combined)
+      const edgeCanvas = document.createElement("canvas");
+      edgeCanvas.width = img.width + 2 * stripW;
+      edgeCanvas.height = img.height + 2 * stripH;
+      const edgeCtx = edgeCanvas.getContext("2d");
+      if (!edgeCtx) return;
+
+      edgeCtx.clearRect(0, 0, edgeCanvas.width, edgeCanvas.height);
+      // top
+      edgeCtx.drawImage(img, 0, 0, img.width, stripH, stripW, 0, img.width, stripH);
+      // bottom
+      edgeCtx.drawImage(img, 0, img.height - stripH, img.width, stripH, stripW, edgeCanvas.height - stripH, img.width, stripH);
+      // left
+      edgeCtx.drawImage(img, 0, 0, stripW, img.height, 0, stripH, stripW, img.height);
+      // right
+      edgeCtx.drawImage(img, img.width - stripW, 0, stripW, img.height, edgeCanvas.width - stripW, stripH, stripW, img.height);
+      // corners
+      edgeCtx.drawImage(img, 0, 0, stripW, stripH, 0, 0, stripW, stripH);
+      edgeCtx.drawImage(img, img.width - stripW, 0, stripW, stripH, edgeCanvas.width - stripW, 0, stripW, stripH);
+      edgeCtx.drawImage(img, 0, img.height - stripH, stripW, stripH, 0, edgeCanvas.height - stripH, stripW, stripH);
+      edgeCtx.drawImage(img, img.width - stripW, img.height - stripH, stripW, stripH, edgeCanvas.width - stripW, edgeCanvas.height - stripH, stripW, stripH);
+
+      setEdgePreview(edgeCanvas.toDataURL("image/png"));
     };
   }, [image, padding, blur, edgeSize]);
 
@@ -136,6 +161,13 @@ export default function EdgeExtendBackground() {
             </button>
           )}
         </>
+      )}
+
+      {edgePreview && (
+        <div style={{ marginTop: "20px" }}>
+          <h2>Edge Strip Preview:</h2>
+          <img src={edgePreview} alt="Edge Preview" style={{ maxWidth: "400px" }} />
+        </div>
       )}
 
       {result && (

@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 
 export default function EdgeExtendBackground() {
-  const [image, setImage] = useState<File | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imgDimensions, setImgDimensions] = useState<{ width: number; height: number } | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [padding, setPadding] = useState<number>(100);
   const [blur, setBlur] = useState<boolean>(false);
@@ -12,17 +13,18 @@ export default function EdgeExtendBackground() {
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setImage(e.target.files[0]);
+      setImageFile(e.target.files[0]);
     }
   };
 
   useEffect(() => {
-    if (!image) return;
+    if (!imageFile) return;
 
     const img = new Image();
-    img.src = URL.createObjectURL(image);
-
+    img.src = URL.createObjectURL(imageFile);
     img.onload = () => {
+      setImgDimensions({ width: img.width, height: img.height });
+
       const canvas = document.createElement("canvas");
       canvas.width = img.width + padding * 2;
       canvas.height = img.height + padding * 2;
@@ -31,7 +33,6 @@ export default function EdgeExtendBackground() {
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Limit edgeSize so it does not exceed image dimensions
       const stripW = Math.min(edgeSize, img.width);
       const stripH = Math.min(edgeSize, img.height);
 
@@ -74,7 +75,7 @@ export default function EdgeExtendBackground() {
 
       setResult(canvas.toDataURL("image/png"));
 
-      // Create edge preview (just the strips combined)
+      // Edge strip preview
       const edgeCanvas = document.createElement("canvas");
       edgeCanvas.width = img.width + 2 * stripW;
       edgeCanvas.height = img.height + 2 * stripH;
@@ -98,7 +99,7 @@ export default function EdgeExtendBackground() {
 
       setEdgePreview(edgeCanvas.toDataURL("image/png"));
     };
-  }, [image, padding, blur, edgeSize]);
+  }, [imageFile, padding, blur, edgeSize]);
 
   const handleDownload = () => {
     if (!result) return;
@@ -113,7 +114,8 @@ export default function EdgeExtendBackground() {
       <h1>Edge Repeated Background Extender</h1>
 
       <input type="file" accept="image/*" onChange={handleImageChange} />
-      {image && (
+
+      {imageFile && (
         <>
           <div style={{ marginTop: "10px" }}>
             <label>
@@ -135,7 +137,7 @@ export default function EdgeExtendBackground() {
               <input
                 type="range"
                 min={10}
-                max={Math.min(300, image ? Math.min(image.width, image.height) : 300)}
+                max={imgDimensions ? Math.min(300, Math.min(imgDimensions.width, imgDimensions.height)) : 300}
                 value={edgeSize}
                 onChange={(e) => setEdgeSize(parseInt(e.target.value))}
                 style={{ marginLeft: "10px", width: "300px" }}

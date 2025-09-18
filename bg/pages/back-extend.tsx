@@ -1,6 +1,6 @@
 // pages/back-extend.tsx
 "use client";
-
+import Head from "next/head";
 import { useState, useRef, useEffect, useCallback } from "react";
 
 type ExportFormat = "png" | "jpeg" | "jpg" | "webp";
@@ -188,6 +188,22 @@ export default function EdgeExtendBackground() {
   };
 
   return (
+      <Head>
+        {/* Page title */}
+        <title>Pixora | Background Extender</title>
+
+        {/* Favicon */}
+        <link rel="icon" href="/favicon.PNG" />
+
+        {/* App logo for mobile/Apple devices */}
+        <link rel="apple-touch-icon" href="/favicon.PNG" />
+
+        {/* Meta description for SEO */}
+        <meta
+          name="description"
+          content="Extend your image background now"
+        />
+</Head>
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
       <h1 className="text-4xl font-extrabold text-blue-900 mb-10 text-center">
         Edge Repeated Background Extender
@@ -312,5 +328,6 @@ export default function EdgeExtendBackground() {
         </div>
       )}
     </div>
+</>
   );
 }

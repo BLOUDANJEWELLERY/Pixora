@@ -7,10 +7,10 @@ export default function App({ Component, pageProps }: AppProps) {
 <>
      <Head>
         {/* Favicon */}
-        <link rel="icon" href="/favicon.PNG" />
+        <link rel="icon" href="/favicon.jpg" />
 
         {/* App logo for mobile devices */}
-        <link rel="apple-touch-icon" href="/favicon.PNG" />
+        <link rel="apple-touch-icon" href="/favicon.jpg" />
 
         {/* Page title */}
         <title>Pixora — AI Image Editing & Background Tools</title>

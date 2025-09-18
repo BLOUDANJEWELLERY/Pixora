@@ -188,6 +188,7 @@ export default function EdgeExtendBackground() {
   };
 
   return (
+<>
       <Head>
         {/* Page title */}
         <title>Pixora | Background Extender</title>

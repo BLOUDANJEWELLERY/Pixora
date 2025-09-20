@@ -4,15 +4,33 @@ import React, { useState, useRef, useEffect } from "react";
 
 // Freeform Cropper Component
 function FreeformCropper({ src, onCropChange }) {
-  const [corners, setCorners] = useState([
-    { x: 50, y: 50 },
-    { x: 250, y: 50 },
-    { x: 250, y: 250 },
-    { x: 50, y: 250 },
-  ]);
+  const [corners, setCorners] = useState([]);
   const [draggingIndex, setDraggingIndex] = useState(null);
   const imgRef = useRef(null);
   const containerRef = useRef(null);
+
+  // Initialize corners once image loads
+  const initCorners = () => {
+    if (!imgRef.current) return;
+    const img = imgRef.current;
+    setCorners([
+      { x: 0, y: 0 },                     // top-left
+      { x: img.width, y: 0 },             // top-right
+      { x: img.width, y: img.height },    // bottom-right
+      { x: 0, y: img.height },            // bottom-left
+    ]);
+  };
+
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!img) return;
+
+    if (img.complete) {
+      initCorners();
+    } else {
+      img.onload = initCorners;
+    }
+  }, [src]);
 
   const startDrag = (index) => (e) => {
     e.preventDefault();
@@ -49,38 +67,34 @@ function FreeformCropper({ src, onCropChange }) {
     };
   }, [draggingIndex]);
 
-const handleCrop = () => {
-  if (!imgRef.current) return;
+  const handleCrop = () => {
+    if (!imgRef.current) return;
 
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-  const img = imgRef.current;
+    const img = imgRef.current;
+    const scaleX = img.naturalWidth / img.width;
+    const scaleY = img.naturalHeight / img.height;
 
-  // Scale factor: image natural size vs displayed size
-  const scaleX = img.naturalWidth / img.width;
-  const scaleY = img.naturalHeight / img.height;
+    const xs = corners.map((p) => p.x * scaleX);
+    const ys = corners.map((p) => p.y * scaleY);
 
-  // Convert corner coordinates to natural image coordinates
-  const xs = corners.map((p) => p.x * scaleX);
-  const ys = corners.map((p) => p.y * scaleY);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
 
-  const minX = Math.min(...xs);
-  const minY = Math.min(...ys);
-  const maxX = Math.max(...xs);
-  const maxY = Math.max(...ys);
+    const width = maxX - minX;
+    const height = maxY - minY;
 
-  const width = maxX - minX;
-  const height = maxY - minY;
+    canvas.width = width;
+    canvas.height = height;
 
-  canvas.width = width;
-  canvas.height = height;
-
-  ctx.drawImage(img, minX, minY, width, height, 0, 0, width, height);
-
-  onCropChange(canvas.toDataURL("image/png"));
-};
+    ctx.drawImage(img, minX, minY, width, height, 0, 0, width, height);
+    onCropChange(canvas.toDataURL("image/png"));
+  };
 
   return (
     <div ref={containerRef} className="relative inline-block w-full">
@@ -90,6 +104,7 @@ const handleCrop = () => {
         className="block w-full rounded-xl border border-blue-300"
         alt="To crop"
       />
+      {/* Polygon overlay */}
       <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
         <polygon
           points={corners.map((p) => `${p.x},${p.y}`).join(" ")}
@@ -98,6 +113,7 @@ const handleCrop = () => {
           strokeWidth={2}
         />
       </svg>
+      {/* Draggable corners */}
       {corners.map((corner, idx) => (
         <div
           key={idx}
@@ -119,7 +135,6 @@ const handleCrop = () => {
 
 // Main Civil ID Page
 export default function CivilIdPage() {
-  // Inside CivilIdPage component
 const [editingImage, setEditingImage] = useState(null); // "front" | "back" | null
 
 const openCropper = (type) => {
@@ -129,13 +144,14 @@ const openCropper = (type) => {
 
 const closeCropper = () => {
   setEditingImage(null);
-  document.body.style.overflow = "auto"; // restore scroll
+  document.body.style.overflow = "auto"; // restore page scroll
 };
 
-const handleCropChange = (croppedDataUrl, type) => {
-  if (type === "front") setFrontPreview(croppedDataUrl);
-  else if (type === "back") setBackPreview(croppedDataUrl);
+const handleCropChange = (dataUrl, type) => {
+  if (type === "front") setFrontPreview(dataUrl);
+  else if (type === "back") setBackPreview(dataUrl);
 };
+
   
   const [frontFile, setFrontFile] = useState(null);
   const [backFile, setBackFile] = useState(null);
@@ -293,9 +309,14 @@ const handleCropChange = (croppedDataUrl, type) => {
         {error && <p className="text-red-600 font-semibold">{error}</p>}
       </div>
 
+// JSX part for image previews
 {frontPreview && (
   <div className="relative">
-    <img src={frontPreview} alt="Front" className="border border-blue-300 shadow-md rounded-xl" />
+    <img
+      src={frontPreview}
+      alt="Front"
+      className="border border-blue-300 shadow-md rounded-xl"
+    />
     <button
       onClick={() => openCropper("front")}
       className="absolute top-2 right-2 bg-blue-600 text-white px-3 py-1 rounded shadow hover:bg-blue-700"
@@ -307,7 +328,11 @@ const handleCropChange = (croppedDataUrl, type) => {
 
 {backPreview && (
   <div className="relative">
-    <img src={backPreview} alt="Back" className="border border-blue-300 shadow-md rounded-xl" />
+    <img
+      src={backPreview}
+      alt="Back"
+      className="border border-blue-300 shadow-md rounded-xl"
+    />
     <button
       onClick={() => openCropper("back")}
       className="absolute top-2 right-2 bg-blue-600 text-white px-3 py-1 rounded shadow hover:bg-blue-700"
@@ -317,6 +342,7 @@ const handleCropChange = (croppedDataUrl, type) => {
   </div>
 )}
 
+// Cropper Overlay
 {editingImage && (
   <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6">
     <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full">

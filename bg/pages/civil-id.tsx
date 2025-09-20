@@ -1,5 +1,3 @@
-Now i need to enhance this civil id pdf generator page firstly the image upload fields are going out of their container box towards fix them in and when creating pdf the civil id images should have a rounder borders so it feels more beautiful while keeping live preview and watermark and everything else intact:
-// pages/civil-id.js:
 "use client";
 import { useState } from "react";
 import jsPDF from "jspdf";

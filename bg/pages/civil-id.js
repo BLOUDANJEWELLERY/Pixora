@@ -139,12 +139,8 @@ const onDrag = (e) => {
       backgroundSize: `${imgRef.current.width * 2}px ${
         imgRef.current.height * 2
       }px`,
-      backgroundPosition: `${
-        Math.min(Math.max(-(dragPos.x * 2 - 50), -(imgRef.current.width * 2 - 100)), 0)
-      }px ${
-        Math.min(Math.max(-(dragPos.y * 2 - 50), -(imgRef.current.height * 2 - 100)), 0)
-      }px`,
-      backgroundRepeat: "no-repeat",
+      backgroundPosition: `-${dragPos.x * 2 - 50}px -${dragPos.y * 2 - 50}px`,
+       backgroundRepeat: "no-repeat",
       backgroundColor: "white",
     }}
   >

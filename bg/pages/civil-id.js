@@ -398,6 +398,31 @@ const handleCropChange = (dataUrl, type) => {
     };
   };
 
+// Inside your component
+useEffect(() => {
+  if (editingImage) {
+    // Prevent scrolling
+    document.body.style.overflow = 'hidden';
+    document.body.style.height = '100%';
+    document.documentElement.style.overflow = 'hidden';
+    document.documentElement.style.height = '100%';
+  } else {
+    // Re-enable scrolling
+    document.body.style.overflow = 'auto';
+    document.body.style.height = 'auto';
+    document.documentElement.style.overflow = 'auto';
+    document.documentElement.style.height = 'auto';
+  }
+
+  // Cleanup function
+  return () => {
+    document.body.style.overflow = 'auto';
+    document.body.style.height = 'auto';
+    document.documentElement.style.overflow = 'auto';
+    document.documentElement.style.height = 'auto';
+  };
+}, [editingImage]);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
       <h1 className="text-4xl font-bold text-blue-900 mb-8">Civil ID Processor</h1>
@@ -479,8 +504,8 @@ const handleCropChange = (dataUrl, type) => {
 
 
 {editingImage && (
-  <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6">
-    <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full">
+  <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6 overflow-hidden">
+    <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
       <h2 className="text-xl font-semibold text-blue-900 mb-4">Edit Image</h2>
       <FreeformCropper
         src={editingImage === "front" ? frontPreview : backPreview}

@@ -542,11 +542,6 @@ const handleCropChange = (dataUrl, type) => {
           </div>
         </div>
       )}
-    </>
-  );
-};
-
-
     </div>
   );
 }

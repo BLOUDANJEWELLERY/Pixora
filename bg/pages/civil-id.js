@@ -172,6 +172,8 @@ function FreeformCropper({ src, onCropChange }) {
 
     ctx.drawImage(img, minX, minY, width, height, 0, 0, width, height);
     onCropChange(canvas.toDataURL("image/png"));
+    
+    setRotation(0);
   };
 
   // Calculate magnifier position (offset from handle)

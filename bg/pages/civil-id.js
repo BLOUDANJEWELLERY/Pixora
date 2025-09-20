@@ -12,6 +12,7 @@ function FreeformCropper({ src, onCropChange }) {
   const imgRef = React.useRef(null);
   const containerRef = React.useRef(null);
   const magnifierCanvasRef = React.useRef(null);
+  const sliderRef = React.useRef(null);
 
   const magnifierSize = 100;
   const zoom = 2;
@@ -112,6 +113,11 @@ function FreeformCropper({ src, onCropChange }) {
   const onDrag = React.useCallback(
     (e) => {
       if (draggingIndex === null || !containerRef.current || !imgRef.current) return;
+      
+      // Check if the event target is the slider
+      if (e.target === sliderRef.current || sliderRef.current?.contains(e.target)) {
+        return; // Don't handle drag events for the slider
+      }
       
       const rect = containerRef.current.getBoundingClientRect();
       const clientX = e.clientX !== undefined ? e.clientX : e.touches?.[0]?.clientX;
@@ -252,6 +258,7 @@ function FreeformCropper({ src, onCropChange }) {
       {/* Rotation Slider */}
       <div className="flex justify-center mt-4">
         <input
+          ref={sliderRef}
           type="range"
           min={-180}
           max={180}
@@ -270,6 +277,7 @@ function FreeformCropper({ src, onCropChange }) {
     </div>
   );
 }
+
 
 // Main Civil ID Page
 export default function CivilIdPage() {

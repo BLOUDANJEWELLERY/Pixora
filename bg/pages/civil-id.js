@@ -41,8 +41,11 @@ const onDrag = (e) => {
   const clientY = e.clientY ?? e.touches?.[0]?.clientY;
 
   // Clamp handle CENTER, not edge
-  const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
-  const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
+  const handleSize = 16; // handle diameter
+const radius = handleSize / 2;
+
+const x = Math.min(Math.max(clientX - rect.left, radius), rect.width - radius);
+const y = Math.min(Math.max(clientY - rect.top, radius), rect.height - radius);
 
   setDragPos({ x, y });
 

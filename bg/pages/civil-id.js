@@ -34,21 +34,22 @@ function FreeformCropper({ src, onCropChange }) {
   };
   const stopDrag = () => setDraggingIndex(null);
 
-  const onDrag = (e) => {
-    if (draggingIndex === null || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const clientX = e.clientX ?? e.touches?.[0]?.clientX;
-    const clientY = e.clientY ?? e.touches?.[0]?.clientY;
+const onDrag = (e) => {
+  if (draggingIndex === null || !containerRef.current) return;
+  const rect = containerRef.current.getBoundingClientRect();
+  const clientX = e.clientX ?? e.touches?.[0]?.clientX;
+  const clientY = e.clientY ?? e.touches?.[0]?.clientY;
 
-    const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
-    const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
+  // Clamp handle CENTER, not edge
+  const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
+  const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
 
-    setDragPos({ x, y }); // update magnifier position
+  setDragPos({ x, y });
 
-    setCorners((prev) =>
-      prev.map((c, i) => (i === draggingIndex ? { x, y } : c))
-    );
-  };
+  setCorners((prev) =>
+    prev.map((c, i) => (i === draggingIndex ? { x, y } : c))
+  );
+};
 
   useEffect(() => {
     window.addEventListener("mousemove", onDrag);
@@ -138,9 +139,13 @@ function FreeformCropper({ src, onCropChange }) {
       backgroundSize: `${imgRef.current.width * 2}px ${
         imgRef.current.height * 2
       }px`,
-      backgroundPosition: `-${dragPos.x * 2 - 50}px -${dragPos.y * 2 - 50}px`,
+      backgroundPosition: `${
+        Math.min(Math.max(-(dragPos.x * 2 - 50), -(imgRef.current.width * 2 - 100)), 0)
+      }px ${
+        Math.min(Math.max(-(dragPos.y * 2 - 50), -(imgRef.current.height * 2 - 100)), 0)
+      }px`,
       backgroundRepeat: "no-repeat",
-      backgroundColor: "white", // fills any area outside the image
+      backgroundColor: "white",
     }}
   >
     {/* Crosshair */}

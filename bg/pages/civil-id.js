@@ -15,6 +15,7 @@ function FreeformCropper({ src, onCropChange }) {
 
   const magnifierSize = 100;
   const zoom = 2;
+  const magnifierOffset = 20; // Offset from cursor
 
   // Initialize corners
   const initCorners = React.useCallback(() => {
@@ -173,9 +174,22 @@ function FreeformCropper({ src, onCropChange }) {
     onCropChange(canvas.toDataURL("image/png"));
   };
 
-  // Calculate magnifier position (centered on handle)
-  const magLeft = dragPos.x - magnifierSize / 2;
-  const magTop = dragPos.y - magnifierSize / 2;
+  // Calculate magnifier position (offset from handle)
+  const imgWidth = imgRef.current ? imgRef.current.width : 0;
+  const imgHeight = imgRef.current ? imgRef.current.height : 0;
+  
+  // Position magnifier based on where the handle is in the image
+  let magLeft = dragPos.x + magnifierOffset;
+  let magTop = dragPos.y + magnifierOffset;
+  
+  // Adjust if near right or bottom edge
+  if (magLeft + magnifierSize > imgWidth) {
+    magLeft = dragPos.x - magnifierSize - magnifierOffset;
+  }
+  
+  if (magTop + magnifierSize > imgHeight) {
+    magTop = dragPos.y - magnifierSize - magnifierOffset;
+  }
 
   return (
     <div ref={containerRef} className="relative inline-block w-full">
@@ -252,7 +266,6 @@ function FreeformCropper({ src, onCropChange }) {
     </div>
   );
 }
-
 
 // Main Civil ID Page
 export default function CivilIdPage() {

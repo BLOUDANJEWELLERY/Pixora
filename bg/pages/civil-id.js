@@ -128,7 +128,7 @@ function FreeformCropper({ src, onCropChange }) {
         {/* Magnifier Preview */}
 {draggingIndex !== null && imgRef.current && (
   <div
-    className="absolute border-2 border-blue-500 rounded-full overflow-hidden pointer-events-none"
+    className="absolute border-2 border-blue-500 rounded-full overflow-hidden pointer-events-none bg-white"
     style={{
       left: dragPos.x + 20,
       top: dragPos.y - 100,
@@ -138,25 +138,12 @@ function FreeformCropper({ src, onCropChange }) {
       backgroundSize: `${imgRef.current.width * 2}px ${
         imgRef.current.height * 2
       }px`,
-      backgroundPosition: (() => {
-        const zoom = 2;
-        const magSize = 100;
-        const imgW = imgRef.current.width * zoom;
-        const imgH = imgRef.current.height * zoom;
-
-        // Calculate desired position
-        let posX = dragPos.x * zoom - magSize / 2;
-        let posY = dragPos.y * zoom - magSize / 2;
-
-        // Clamp so it never goes outside
-        posX = Math.max(0, Math.min(posX, imgW - magSize));
-        posY = Math.max(0, Math.min(posY, imgH - magSize));
-
-        return `-${posX}px -${posY}px`;
-      })(),
+      backgroundPosition: `-${dragPos.x * 2 - 50}px -${dragPos.y * 2 - 50}px`,
+      backgroundRepeat: "no-repeat",
+      backgroundColor: "white", // fills any area outside the image
     }}
   >
-    {/* Crosshair marker */}
+    {/* Crosshair */}
     <div className="absolute inset-0 flex items-center justify-center">
       <div className="absolute w-0.5 h-6 bg-red-500" />
       <div className="absolute w-6 h-0.5 bg-red-500" />

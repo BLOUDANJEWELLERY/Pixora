@@ -135,11 +135,11 @@ const onDrag = (e) => {
       // Decide position dynamically
       left:
         dragPos.x < 60
-          ? dragPos.x + 00 // if too close to left, push right
+          ? dragPos.x + 0 // if too close to left, push right
           : dragPos.x - 120, // default: show on left
       top:
         dragPos.y < 60
-          ? dragPos.y + p0 // if too close to top, push below
+          ? dragPos.y + 0 // if too close to top, push below
           : dragPos.y - 120, // default: show above
       width: 100,
       height: 100,

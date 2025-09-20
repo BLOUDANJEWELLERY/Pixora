@@ -7,9 +7,11 @@ function FreeformCropper({ src, onCropChange }) {
   const [draggingIndex, setDraggingIndex] = React.useState(null);
   const [dragPos, setDragPos] = React.useState({ x: 0, y: 0 });
   const [rotation, setRotation] = React.useState(0);
+  const [magnifierImage, setMagnifierImage] = React.useState(null);
 
   const imgRef = React.useRef(null);
   const containerRef = React.useRef(null);
+  const magnifierCanvasRef = React.useRef(null);
 
   const magnifierSize = 100;
   const zoom = 2;
@@ -32,6 +34,72 @@ function FreeformCropper({ src, onCropChange }) {
     if (img.complete) initCorners();
     else img.onload = initCorners;
   }, [src, initCorners]);
+
+  // Load image for magnifier
+  React.useEffect(() => {
+    const img = new Image();
+    img.onload = () => setMagnifierImage(img);
+    img.src = src;
+  }, [src]);
+
+  // Update magnifier canvas
+  React.useEffect(() => {
+    if (!magnifierCanvasRef.current || !magnifierImage || draggingIndex === null) return;
+    
+    const canvas = magnifierCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const img = imgRef.current;
+    
+    if (!ctx || !img) return;
+    
+    // Clear canvas with white background
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, magnifierSize, magnifierSize);
+    
+    // Calculate the area to draw from the source image
+    const sourceX = dragPos.x - magnifierSize / (2 * zoom);
+    const sourceY = dragPos.y - magnifierSize / (2 * zoom);
+    const sourceWidth = magnifierSize / zoom;
+    const sourceHeight = magnifierSize / zoom;
+    
+    // Only draw the part of the image that's within bounds
+    if (sourceX < img.width && sourceY < img.height && 
+        sourceX + sourceWidth > 0 && sourceY + sourceHeight > 0) {
+      
+      // Calculate the actual drawable area
+      const drawX = Math.max(0, sourceX);
+      const drawY = Math.max(0, sourceY);
+      const drawWidth = Math.min(sourceWidth, img.width - drawX, sourceX + sourceWidth - drawX);
+      const drawHeight = Math.min(sourceHeight, img.height - drawY, sourceY + sourceHeight - drawY);
+      
+      // Calculate where to draw on the canvas
+      const canvasX = Math.max(0, (drawX - sourceX) * zoom);
+      const canvasY = Math.max(0, (drawY - sourceY) * zoom);
+      
+      // Draw the image portion
+      ctx.drawImage(
+        magnifierImage,
+        drawX * (magnifierImage.width / img.width),
+        drawY * (magnifierImage.height / img.height),
+        drawWidth * (magnifierImage.width / img.width),
+        drawHeight * (magnifierImage.height / img.height),
+        canvasX,
+        canvasY,
+        drawWidth * zoom,
+        drawHeight * zoom
+      );
+    }
+    
+    // Draw crosshair
+    ctx.strokeStyle = 'red';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(magnifierSize / 2, 0);
+    ctx.lineTo(magnifierSize / 2, magnifierSize);
+    ctx.moveTo(0, magnifierSize / 2);
+    ctx.lineTo(magnifierSize, magnifierSize / 2);
+    ctx.stroke();
+  }, [dragPos, magnifierImage, draggingIndex]);
 
   const startDrag = (index) => (e) => {
     e.preventDefault();
@@ -105,18 +173,9 @@ function FreeformCropper({ src, onCropChange }) {
     onCropChange(canvas.toDataURL("image/png"));
   };
 
-  // Get image dimensions
-  const imgWidth = imgRef.current ? imgRef.current.width : 0;
-  const imgHeight = imgRef.current ? imgRef.current.height : 0;
-
   // Calculate magnifier position (centered on handle)
   const magLeft = dragPos.x - magnifierSize / 2;
   const magTop = dragPos.y - magnifierSize / 2;
-
-  // Calculate background position for magnifier
-  // Allow negative values to show white space at edges
-  const bgX = dragPos.x * zoom - magnifierSize / 2;
-  const bgY = dragPos.y * zoom - magnifierSize / 2;
 
   return (
     <div ref={containerRef} className="relative inline-block w-full">
@@ -159,21 +218,15 @@ function FreeformCropper({ src, onCropChange }) {
               top: magTop,
               width: magnifierSize,
               height: magnifierSize,
-              backgroundImage: `url(${src})`,
-              backgroundSize: `${imgWidth * zoom}px ${imgHeight * zoom}px`,
-              backgroundPosition: `-${bgX}px -${bgY}px`,
-              backgroundRepeat: "no-repeat",
-              backgroundColor: "white",
               zIndex: 1000,
-              // Ensure magnifier is always visible even when partially outside
               boxShadow: '0 0 10px rgba(0,0,0,0.5)',
             }}
           >
-            {/* Crosshair */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="absolute w-0.5 h-6 bg-red-500" />
-              <div className="absolute w-6 h-0.5 bg-red-500" />
-            </div>
+            <canvas
+              ref={magnifierCanvasRef}
+              width={magnifierSize}
+              height={magnifierSize}
+            />
           </div>
         )}
       </div>

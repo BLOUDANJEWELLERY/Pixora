@@ -2,14 +2,14 @@
 import jsPDF from "jspdf";
 import React, { useState, useRef, useEffect } from "react";
 
-// Freeform Cropper Component
 function FreeformCropper({ src, onCropChange }) {
   const [corners, setCorners] = useState([]);
   const [draggingIndex, setDraggingIndex] = useState(null);
+  const [rotation, setRotation] = useState(0); // rotation in degrees
   const imgRef = useRef(null);
   const containerRef = useRef(null);
 
-  // Initialize corners once image loads
+  // Initialize corners at image edges
   const initCorners = () => {
     if (!imgRef.current) return;
     const img = imgRef.current;
@@ -24,19 +24,14 @@ function FreeformCropper({ src, onCropChange }) {
   useEffect(() => {
     const img = imgRef.current;
     if (!img) return;
-
-    if (img.complete) {
-      initCorners();
-    } else {
-      img.onload = initCorners;
-    }
+    if (img.complete) initCorners();
+    else img.onload = initCorners;
   }, [src]);
 
   const startDrag = (index) => (e) => {
     e.preventDefault();
     setDraggingIndex(index);
   };
-
   const stopDrag = () => setDraggingIndex(null);
 
   const onDrag = (e) => {
@@ -58,7 +53,6 @@ function FreeformCropper({ src, onCropChange }) {
     window.addEventListener("mouseup", stopDrag);
     window.addEventListener("touchmove", onDrag);
     window.addEventListener("touchend", stopDrag);
-
     return () => {
       window.removeEventListener("mousemove", onDrag);
       window.removeEventListener("mouseup", stopDrag);
@@ -69,7 +63,6 @@ function FreeformCropper({ src, onCropChange }) {
 
   const handleCrop = () => {
     if (!imgRef.current) return;
-
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -78,51 +71,71 @@ function FreeformCropper({ src, onCropChange }) {
     const scaleX = img.naturalWidth / img.width;
     const scaleY = img.naturalHeight / img.height;
 
+    // Convert corners to natural image coordinates
     const xs = corners.map((p) => p.x * scaleX);
     const ys = corners.map((p) => p.y * scaleY);
-
     const minX = Math.min(...xs);
     const minY = Math.min(...ys);
     const maxX = Math.max(...xs);
     const maxY = Math.max(...ys);
-
     const width = maxX - minX;
     const height = maxY - minY;
 
+    // Set canvas size
     canvas.width = width;
     canvas.height = height;
 
+    // Move origin to center for rotation
+    ctx.translate(width / 2, height / 2);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.translate(-width / 2, -height / 2);
+
     ctx.drawImage(img, minX, minY, width, height, 0, 0, width, height);
+
     onCropChange(canvas.toDataURL("image/png"));
   };
 
   return (
     <div ref={containerRef} className="relative inline-block w-full">
-      <img
-        src={src}
-        ref={imgRef}
-        className="block w-full rounded-xl border border-blue-300"
-        alt="To crop"
-      />
-      {/* Polygon overlay */}
-      <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
-        <polygon
-          points={corners.map((p) => `${p.x},${p.y}`).join(" ")}
-          fill="rgba(59,130,246,0.2)"
-          stroke="rgba(59,130,246,0.8)"
-          strokeWidth={2}
+      <div className="relative">
+        <img
+          src={src}
+          ref={imgRef}
+          className="block w-full rounded-xl border border-blue-300 transform"
+          style={{ transform: `rotate(${rotation}deg)` }}
+          alt="To crop"
         />
-      </svg>
-      {/* Draggable corners */}
-      {corners.map((corner, idx) => (
-        <div
-          key={idx}
-          onMouseDown={startDrag(idx)}
-          onTouchStart={startDrag(idx)}
-          className="absolute w-4 h-4 bg-blue-600 rounded-full cursor-grab"
-          style={{ left: corner.x - 8, top: corner.y - 8 }}
+        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
+          <polygon
+            points={corners.map((p) => `${p.x},${p.y}`).join(" ")}
+            fill="rgba(59,130,246,0.2)"
+            stroke="rgba(59,130,246,0.8)"
+            strokeWidth={2}
+          />
+        </svg>
+        {corners.map((corner, idx) => (
+          <div
+            key={idx}
+            onMouseDown={startDrag(idx)}
+            onTouchStart={startDrag(idx)}
+            className="absolute w-4 h-4 bg-blue-600 rounded-full cursor-grab"
+            style={{ left: corner.x - 8, top: corner.y - 8 }}
+          />
+        ))}
+      </div>
+
+      {/* Rotation Slider */}
+      <div className="flex justify-center mt-4">
+        <input
+          type="range"
+          min={-180}
+          max={180}
+          value={rotation}
+          onChange={(e) => setRotation(Number(e.target.value))}
+          className="w-1/2"
         />
-      ))}
+      </div>
+
       <button
         onClick={handleCrop}
         className="mt-2 bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-2 px-4 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"

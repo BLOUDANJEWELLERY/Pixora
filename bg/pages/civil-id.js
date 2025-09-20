@@ -109,17 +109,14 @@ function FreeformCropper({ src, onCropChange }) {
   const imgWidth = imgRef.current ? imgRef.current.width : 0;
   const imgHeight = imgRef.current ? imgRef.current.height : 0;
 
-  // Calculate magnifier position (clamped to image boundaries)
-  const magLeft = Math.max(0, Math.min(dragPos.x - magnifierSize / 2, imgWidth - magnifierSize));
-  const magTop = Math.max(0, Math.min(dragPos.y - magnifierSize / 2, imgHeight - magnifierSize));
+  // Calculate magnifier position (centered on handle)
+  const magLeft = dragPos.x - magnifierSize / 2;
+  const magTop = dragPos.y - magnifierSize / 2;
 
-  // Calculate background position (allow blank space when near edges)
-  let bgX = dragPos.x * zoom - magnifierSize / 2;
-  let bgY = dragPos.y * zoom - magnifierSize / 2;
-
-  // Adjust background position to prevent sticking at edges
-  bgX = Math.max(0, Math.min(bgX, imgWidth * zoom - magnifierSize));
-  bgY = Math.max(0, Math.min(bgY, imgHeight * zoom - magnifierSize));
+  // Calculate background position for magnifier
+  // Allow negative values to show white space at edges
+  const bgX = dragPos.x * zoom - magnifierSize / 2;
+  const bgY = dragPos.y * zoom - magnifierSize / 2;
 
   return (
     <div ref={containerRef} className="relative inline-block w-full">
@@ -167,7 +164,9 @@ function FreeformCropper({ src, onCropChange }) {
               backgroundPosition: `-${bgX}px -${bgY}px`,
               backgroundRepeat: "no-repeat",
               backgroundColor: "white",
-              zIndex: 1000, // Ensure magnifier is on top
+              zIndex: 1000,
+              // Ensure magnifier is always visible even when partially outside
+              boxShadow: '0 0 10px rgba(0,0,0,0.5)',
             }}
           >
             {/* Crosshair */}
@@ -200,6 +199,7 @@ function FreeformCropper({ src, onCropChange }) {
     </div>
   );
 }
+
 
 // Main Civil ID Page
 export default function CivilIdPage() {

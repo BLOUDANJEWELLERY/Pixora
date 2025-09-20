@@ -155,7 +155,7 @@ const bgY = Math.min(
       height: 100,
       backgroundImage: `url(${src})`,
       backgroundSize: `${imgRef.current.width * 2}px ${imgRef.current.height * 2}px`,
-      backgroundPosition: `-${bgX}px -${bgY}px`;
+      backgroundPosition: `-${bgX}px -${bgY}px`,
       backgroundRepeat: "no-repeat",
       backgroundColor: "white",
     }}

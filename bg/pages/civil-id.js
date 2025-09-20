@@ -398,30 +398,39 @@ const handleCropChange = (dataUrl, type) => {
     };
   };
 
-// Inside your component
-useEffect(() => {
-  if (editingImage) {
-    // Prevent scrolling
-    document.body.style.overflow = 'hidden';
-    document.body.style.height = '100%';
-    document.documentElement.style.overflow = 'hidden';
-    document.documentElement.style.height = '100%';
-  } else {
-    // Re-enable scrolling
-    document.body.style.overflow = 'auto';
-    document.body.style.height = 'auto';
-    document.documentElement.style.overflow = 'auto';
-    document.documentElement.style.height = 'auto';
-  }
+  // Effect to prevent scrolling when modal is open
+  useEffect(() => {
+    if (editingImage) {
+      // Store the current scroll position
+      const scrollY = window.scrollY;
+      
+      // Prevent scrolling
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Re-enable scrolling and restore scroll position
+      const scrollY = document.body.style.top;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
+    }
+    
+    // Cleanup function
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+    };
+  }, [editingImage]);
 
-  // Cleanup function
-  return () => {
-    document.body.style.overflow = 'auto';
-    document.body.style.height = 'auto';
-    document.documentElement.style.overflow = 'auto';
-    document.documentElement.style.height = 'auto';
-  };
-}, [editingImage]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
@@ -502,27 +511,40 @@ useEffect(() => {
   </div>
 )}
 
-{editingImage && (
-  <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 overflow-hidden">
-    <div className="bg-white p-6 rounded-2xl shadow-2xl w-full h-full max-h-full overflow-y-auto">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold text-blue-900">Edit Image</h2>
-        <button
-          onClick={closeCropper}
-          className="text-gray-500 hover:text-gray-700 text-2xl"
+    {/* Modal */}
+      {editingImage && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6"
+          style={{ 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0,
+            overflow: 'hidden'
+          }}
         >
-          ×
-        </button>
-      </div>
-      <div className="h-[calc(100%-80px)]">
-        <FreeformCropper
-          src={editingImage === "front" ? frontPreview : backPreview}
-          onCropChange={(dataUrl) => handleCropChange(dataUrl, editingImage)}
-        />
-      </div>
-    </div>
-  </div>
-)}
+          <div 
+            className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-semibold text-blue-900 mb-4">Edit Image</h2>
+            <FreeformCropper
+              src={editingImage === "front" ? frontPreview : backPreview}
+              onCropChange={(dataUrl) => handleCropChange(dataUrl, editingImage)}
+            />
+            <button
+              onClick={closeCropper}
+              className="mt-4 bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
 
 
     </div>

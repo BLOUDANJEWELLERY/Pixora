@@ -10,7 +10,7 @@ export default function EdgeExtendBackground() {
   const [imgDimensions, setImgDimensions] = useState<{ width: number; height: number } | null>(null);
 
   const [padding, setPadding] = useState<number>(100);
-  const [blur, setBlur] = useState<boolean>(false);
+  const [blur] = useState<boolean>(false);
   const [edgeSize, setEdgeSize] = useState<number>(50);
 
   const [format, setFormat] = useState<ExportFormat>("png");

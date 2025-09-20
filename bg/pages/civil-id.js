@@ -94,6 +94,16 @@ const onDrag = (e) => {
     onCropChange(canvas.toDataURL("image/png"));
   };
 
+const bgX = Math.min(
+    Math.max(dragPos.x * zoom - magSize / 2, 0),
+    img.width * zoom - magSize
+);
+
+const bgY = Math.min(
+    Math.max(dragPos.y * zoom - magSize / 2, 0),
+    img.height * zoom - magSize
+);
+
   return (
     <div ref={containerRef} className="relative inline-block w-full">
       <div className="relative">
@@ -135,17 +145,17 @@ const onDrag = (e) => {
       // Decide position dynamically
       left:
         dragPos.x < 60
-          ? dragPos.x + 0 // if too close to left, push right
+          ? dragPos.x + 20 // if too close to left, push right
           : dragPos.x - 120, // default: show on left
       top:
         dragPos.y < 60
-          ? dragPos.y + 0 // if too close to top, push below
+          ? dragPos.y + 20 // if too close to top, push below
           : dragPos.y - 120, // default: show above
       width: 100,
       height: 100,
       backgroundImage: `url(${src})`,
       backgroundSize: `${imgRef.current.width * 2}px ${imgRef.current.height * 2}px`,
-      backgroundPosition: `-${dragPos.x * 2 - 50}px -${dragPos.y * 2 - 50}px`,
+      backgroundPosition: `-${bgX}px -${bgY}px`;
       backgroundRepeat: "no-repeat",
       backgroundColor: "white",
     }}

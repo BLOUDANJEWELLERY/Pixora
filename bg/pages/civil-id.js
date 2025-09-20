@@ -5,19 +5,19 @@ import React, { useState, useRef, useEffect } from "react";
 function FreeformCropper({ src, onCropChange }) {
   const [corners, setCorners] = useState([]);
   const [draggingIndex, setDraggingIndex] = useState(null);
-  const [rotation, setRotation] = useState(0); // rotation in degrees
+  const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
+  const [rotation, setRotation] = useState(0);
   const imgRef = useRef(null);
   const containerRef = useRef(null);
 
-  // Initialize corners at image edges
   const initCorners = () => {
     if (!imgRef.current) return;
     const img = imgRef.current;
     setCorners([
-      { x: 0, y: 0 },                     // top-left
-      { x: img.width, y: 0 },             // top-right
-      { x: img.width, y: img.height },    // bottom-right
-      { x: 0, y: img.height },            // bottom-left
+      { x: 0, y: 0 },
+      { x: img.width, y: 0 },
+      { x: img.width, y: img.height },
+      { x: 0, y: img.height },
     ]);
   };
 
@@ -37,11 +37,13 @@ function FreeformCropper({ src, onCropChange }) {
   const onDrag = (e) => {
     if (draggingIndex === null || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const clientX = e.clientX !== undefined ? e.clientX : e.touches[0].clientX;
-    const clientY = e.clientY !== undefined ? e.clientY : e.touches[0].clientY;
+    const clientX = e.clientX ?? e.touches?.[0]?.clientX;
+    const clientY = e.clientY ?? e.touches?.[0]?.clientY;
 
     const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
     const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
+
+    setDragPos({ x, y }); // update magnifier position
 
     setCorners((prev) =>
       prev.map((c, i) => (i === draggingIndex ? { x, y } : c))
@@ -71,7 +73,6 @@ function FreeformCropper({ src, onCropChange }) {
     const scaleX = img.naturalWidth / img.width;
     const scaleY = img.naturalHeight / img.height;
 
-    // Convert corners to natural image coordinates
     const xs = corners.map((p) => p.x * scaleX);
     const ys = corners.map((p) => p.y * scaleY);
     const minX = Math.min(...xs);
@@ -81,17 +82,14 @@ function FreeformCropper({ src, onCropChange }) {
     const width = maxX - minX;
     const height = maxY - minY;
 
-    // Set canvas size
     canvas.width = width;
     canvas.height = height;
 
-    // Move origin to center for rotation
     ctx.translate(width / 2, height / 2);
     ctx.rotate((rotation * Math.PI) / 180);
     ctx.translate(-width / 2, -height / 2);
 
     ctx.drawImage(img, minX, minY, width, height, 0, 0, width, height);
-
     onCropChange(canvas.toDataURL("image/png"));
   };
 
@@ -101,10 +99,12 @@ function FreeformCropper({ src, onCropChange }) {
         <img
           src={src}
           ref={imgRef}
-          className="block w-full rounded-xl border border-blue-300 transform"
+          className="block w-full rounded-xl border border-blue-300"
           style={{ transform: `rotate(${rotation}deg)` }}
           alt="To crop"
         />
+
+        {/* Polygon */}
         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
           <polygon
             points={corners.map((p) => `${p.x},${p.y}`).join(" ")}
@@ -113,6 +113,8 @@ function FreeformCropper({ src, onCropChange }) {
             strokeWidth={2}
           />
         </svg>
+
+        {/* Draggable handles */}
         {corners.map((corner, idx) => (
           <div
             key={idx}
@@ -122,6 +124,26 @@ function FreeformCropper({ src, onCropChange }) {
             style={{ left: corner.x - 8, top: corner.y - 8 }}
           />
         ))}
+
+        {/* Magnifier Preview */}
+        {draggingIndex !== null && (
+          <div
+            className="absolute border-2 border-blue-500 rounded-lg overflow-hidden pointer-events-none"
+            style={{
+              left: dragPos.x + 20,
+              top: dragPos.y - 80,
+              width: 80,
+              height: 80,
+              backgroundImage: `url(${src})`,
+              backgroundSize: `${imgRef.current?.width * 2}px ${
+                imgRef.current?.height * 2
+              }px`,
+              backgroundPosition: `-${dragPos.x * 2 - 40}px -${
+                dragPos.y * 2 - 40
+              }px`,
+            }}
+          />
+        )}
       </div>
 
       {/* Rotation Slider */}

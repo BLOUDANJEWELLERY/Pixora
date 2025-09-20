@@ -108,8 +108,8 @@ function FreeformCropper({ src, onCropChange }: CropperProps) {
         Crop
       </button>
     </div>
-  )
-  
+  );
+  }
 export default function CivilIdPage() {
   const [frontFile, setFrontFile] = useState(null);
   const [backFile, setBackFile] = useState(null);

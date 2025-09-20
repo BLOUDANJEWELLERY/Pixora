@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect } from "react";
 function FreeformCropper({ src, onCropChange }) {
   const [corners, setCorners] = useState([]);
   const [draggingIndex, setDraggingIndex] = useState(null);
-  const [rotation, setRotation] = useState(0); // degrees
+  const [rotation, setRotation] = useState(0); // rotation in degrees
   const imgRef = useRef(null);
   const containerRef = useRef(null);
 
@@ -13,13 +13,12 @@ function FreeformCropper({ src, onCropChange }) {
   const initCorners = () => {
     if (!imgRef.current) return;
     const img = imgRef.current;
-    const initial = [
-      { x: 0, y: 0 },                   // top-left
-      { x: img.width, y: 0 },           // top-right
-      { x: img.width, y: img.height },  // bottom-right
-      { x: 0, y: img.height },          // bottom-left
-    ];
-    setCorners(initial);
+    setCorners([
+      { x: 0, y: 0 },                     // top-left
+      { x: img.width, y: 0 },             // top-right
+      { x: img.width, y: img.height },    // bottom-right
+      { x: 0, y: img.height },            // bottom-left
+    ]);
   };
 
   useEffect(() => {
@@ -28,19 +27,6 @@ function FreeformCropper({ src, onCropChange }) {
     if (img.complete) initCorners();
     else img.onload = initCorners;
   }, [src]);
-
-  // Rotate a point around center
-  const rotatePoint = (point, center, angleDeg) => {
-    const angle = (angleDeg * Math.PI) / 180;
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    const dx = point.x - center.x;
-    const dy = point.y - center.y;
-    return {
-      x: center.x + dx * cos - dy * sin,
-      y: center.y + dx * sin + dy * cos,
-    };
-  };
 
   const startDrag = (index) => (e) => {
     e.preventDefault();
@@ -57,16 +43,8 @@ function FreeformCropper({ src, onCropChange }) {
     const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
     const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
 
-    // Inverse rotate the dragged point to keep rotation consistent
-    const center = { x: imgRef.current.width / 2, y: imgRef.current.height / 2 };
-    const angle = (-rotation * Math.PI) / 180;
-    const dx = x - center.x;
-    const dy = y - center.y;
-    const unrotatedX = center.x + dx * Math.cos(angle) - dy * Math.sin(angle);
-    const unrotatedY = center.y + dx * Math.sin(angle) + dy * Math.cos(angle);
-
     setCorners((prev) =>
-      prev.map((c, i) => (i === draggingIndex ? { x: unrotatedX, y: unrotatedY } : c))
+      prev.map((c, i) => (i === draggingIndex ? { x, y } : c))
     );
   };
 
@@ -81,7 +59,7 @@ function FreeformCropper({ src, onCropChange }) {
       window.removeEventListener("touchmove", onDrag);
       window.removeEventListener("touchend", stopDrag);
     };
-  }, [draggingIndex, rotation]);
+  }, [draggingIndex]);
 
   const handleCrop = () => {
     if (!imgRef.current) return;
@@ -93,12 +71,9 @@ function FreeformCropper({ src, onCropChange }) {
     const scaleX = img.naturalWidth / img.width;
     const scaleY = img.naturalHeight / img.height;
 
-    // Rotate corners to natural coordinates
-    const center = { x: img.width / 2, y: img.height / 2 };
-    const rotatedCorners = corners.map((p) => rotatePoint(p, center, rotation));
-
-    const xs = rotatedCorners.map((p) => p.x * scaleX);
-    const ys = rotatedCorners.map((p) => p.y * scaleY);
+    // Convert corners to natural image coordinates
+    const xs = corners.map((p) => p.x * scaleX);
+    const ys = corners.map((p) => p.y * scaleY);
     const minX = Math.min(...xs);
     const minY = Math.min(...ys);
     const maxX = Math.max(...xs);
@@ -106,21 +81,19 @@ function FreeformCropper({ src, onCropChange }) {
     const width = maxX - minX;
     const height = maxY - minY;
 
+    // Set canvas size
     canvas.width = width;
     canvas.height = height;
 
-    // Rotate the canvas for actual cropping
+    // Move origin to center for rotation
     ctx.translate(width / 2, height / 2);
     ctx.rotate((rotation * Math.PI) / 180);
     ctx.translate(-width / 2, -height / 2);
 
     ctx.drawImage(img, minX, minY, width, height, 0, 0, width, height);
+
     onCropChange(canvas.toDataURL("image/png"));
   };
-
-  // Compute rotated corners for overlay
-  const center = imgRef.current ? { x: imgRef.current.width / 2, y: imgRef.current.height / 2 } : { x: 0, y: 0 };
-  const rotatedCorners = corners.map((p) => rotatePoint(p, center, rotation));
 
   return (
     <div ref={containerRef} className="relative inline-block w-full">
@@ -134,13 +107,13 @@ function FreeformCropper({ src, onCropChange }) {
         />
         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
           <polygon
-            points={rotatedCorners.map((p) => `${p.x},${p.y}`).join(" ")}
+            points={corners.map((p) => `${p.x},${p.y}`).join(" ")}
             fill="rgba(59,130,246,0.2)"
             stroke="rgba(59,130,246,0.8)"
             strokeWidth={2}
           />
         </svg>
-        {rotatedCorners.map((corner, idx) => (
+        {corners.map((corner, idx) => (
           <div
             key={idx}
             onMouseDown={startDrag(idx)}

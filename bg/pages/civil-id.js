@@ -14,7 +14,7 @@ function FreeformCropper({ src, onCropChange }) {
   const magnifierSize = 100;
   const zoom = 2;
 
-  // Initialize corners at image edges
+  // Initialize corners
   const initCorners = React.useCallback(() => {
     if (!imgRef.current) return;
     const img = imgRef.current;
@@ -43,12 +43,12 @@ function FreeformCropper({ src, onCropChange }) {
   const onDrag = React.useCallback(
     (e) => {
       if (draggingIndex === null || !containerRef.current || !imgRef.current) return;
-
       const rect = containerRef.current.getBoundingClientRect();
       const clientX = e.clientX !== undefined ? e.clientX : e.touches?.[0]?.clientX;
       const clientY = e.clientY !== undefined ? e.clientY : e.touches?.[0]?.clientY;
       if (clientX === undefined || clientY === undefined) return;
 
+      // Clamp handle strictly inside image
       const x = Math.min(Math.max(clientX - rect.left, 0), imgRef.current.width);
       const y = Math.min(Math.max(clientY - rect.top, 0), imgRef.current.height);
 
@@ -105,23 +105,17 @@ function FreeformCropper({ src, onCropChange }) {
     onCropChange(canvas.toDataURL("image/png"));
   };
 
-  // Calculate magnifier background so it allows blank space on all edges
+  // Magnifier background and position (allow blank space)
   const imgWidth = imgRef.current ? imgRef.current.width : 0;
   const imgHeight = imgRef.current ? imgRef.current.height : 0;
 
+  // Calculate bg position so that magnifier shows blank areas if outside image
   let bgX = dragPos.x * zoom - magnifierSize / 2;
   let bgY = dragPos.y * zoom - magnifierSize / 2;
 
-  const maxBgX = imgWidth * zoom - magnifierSize;
-  const maxBgY = imgHeight * zoom - magnifierSize;
-
-  // Clamp only max, allow negative to show blank on top/left
-  bgX = Math.min(bgX, maxBgX);
-  bgY = Math.min(bgY, maxBgY);
-
-  // Magnifier div position (hover around handle, clamp inside container)
-  const magLeft = Math.min(Math.max(dragPos.x - magnifierSize / 2, 0), imgWidth - magnifierSize);
-  const magTop = Math.min(Math.max(dragPos.y - magnifierSize / 2, 0), imgHeight - magnifierSize);
+  // Magnifier position relative to handle
+  const magLeft = dragPos.x - magnifierSize / 2;
+  const magTop = dragPos.y - magnifierSize / 2;
 
   return (
     <div ref={containerRef} className="relative inline-block w-full">

@@ -1,9 +1,9 @@
 // pages/civil-id.js:
 "use client";
-import { useState } from "react";
 import jsPDF from "jspdf";
+import React, { useState, useRef, useEffect } from "react";
 
-// Define Point type here
+// Point type
 interface Point {
   x: number;
   y: number;
@@ -14,7 +14,8 @@ interface CropperProps {
   onCropChange: (croppedDataUrl: string) => void;
 }
 
-function FreeformCropper({ src, onCropChange }: CropperProps) {
+export default function FreeformCropper({ src, onCropChange }: CropperProps) {
+  // Initial corner points
   const [corners, setCorners] = useState<Point[]>([
     { x: 50, y: 50 },
     { x: 250, y: 50 },
@@ -22,30 +23,36 @@ function FreeformCropper({ src, onCropChange }: CropperProps) {
     { x: 50, y: 250 },
   ]);
 
-  const [dragging, setDragging] = useState<number | null>(null);
-  const imgRef = React.useRef<HTMLImageElement>(null);
-  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
+  // Start dragging a corner
   const startDrag = (index: number) => (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
-    setDragging(index);
+    setDraggingIndex(index);
   };
-  const stopDrag = () => setDragging(null);
 
+  // Stop dragging
+  const stopDrag = () => setDraggingIndex(null);
+
+  // Dragging logic
   const onDrag = (e: MouseEvent | TouchEvent) => {
-    if (dragging === null || !containerRef.current) return;
+    if (draggingIndex === null || !containerRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
-    let clientX = "clientX" in e ? e.clientX : e.touches[0].clientX;
-    let clientY = "clientY" in e ? e.clientY : e.touches[0].clientY;
+    const clientX = "clientX" in e ? e.clientX : e.touches[0].clientX;
+    const clientY = "clientY" in e ? e.clientY : e.touches[0].clientY;
 
     const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
     const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
 
-    setCorners((prev) => prev.map((c, i) => (i === dragging ? { x, y } : c)));
+    setCorners((prev) =>
+      prev.map((c, i) => (i === draggingIndex ? { x, y } : c))
+    );
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     window.addEventListener("mousemove", onDrag);
     window.addEventListener("mouseup", stopDrag);
     window.addEventListener("touchmove", onDrag);
@@ -56,33 +63,31 @@ function FreeformCropper({ src, onCropChange }: CropperProps) {
       window.removeEventListener("touchmove", onDrag);
       window.removeEventListener("touchend", stopDrag);
     };
-  }, [dragging]);
+  }, [draggingIndex]);
 
+  // Crop image based on corners
   const handleCrop = () => {
     if (!imgRef.current) return;
+
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const xs = corners.map((p) => p.x);
     const ys = corners.map((p) => p.y);
-    const width = Math.max(...xs) - Math.min(...xs);
-    const height = Math.max(...ys) - Math.min(...ys);
+
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+
+    const width = maxX - minX;
+    const height = maxY - minY;
 
     canvas.width = width;
     canvas.height = height;
 
-    ctx.drawImage(
-      imgRef.current,
-      Math.min(...xs),
-      Math.min(...ys),
-      width,
-      height,
-      0,
-      0,
-      width,
-      height
-    );
+    ctx.drawImage(imgRef.current, minX, minY, width, height, 0, 0, width, height);
 
     const dataUrl = canvas.toDataURL("image/png");
     onCropChange(dataUrl);
@@ -90,7 +95,13 @@ function FreeformCropper({ src, onCropChange }: CropperProps) {
 
   return (
     <div ref={containerRef} className="relative inline-block w-full">
-      <img src={src} ref={imgRef} className="block w-full rounded-xl border border-blue-300" />
+      <img
+        src={src}
+        ref={imgRef}
+        className="block w-full rounded-xl border border-blue-300"
+        alt="To crop"
+      />
+      {/* Polygon overlay */}
       <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
         <polygon
           points={corners.map((p) => `${p.x},${p.y}`).join(" ")}
@@ -99,6 +110,7 @@ function FreeformCropper({ src, onCropChange }: CropperProps) {
           strokeWidth={2}
         />
       </svg>
+      {/* Draggable corners */}
       {corners.map((corner, idx) => (
         <div
           key={idx}
@@ -116,7 +128,8 @@ function FreeformCropper({ src, onCropChange }: CropperProps) {
       </button>
     </div>
   );
-  }
+}
+
 export default function CivilIdPage() {
   const [frontFile, setFrontFile] = useState(null);
   const [backFile, setBackFile] = useState(null);

@@ -255,7 +255,7 @@ function FreeformCropper({ src, onCropChange }) {
           max={180}
           value={rotation}
           onChange={(e) => setRotation(Number(e.target.value))}
-          className="w-1/2"
+          className="w-1/2 z-1100"
         />
       </div>
 

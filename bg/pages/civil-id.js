@@ -19,10 +19,10 @@ function FreeformCropper({ src, onCropChange }) {
     if (!imgRef.current) return;
     const img = imgRef.current;
     setCorners([
-      { x: 0, y: 0 },                  // top-left
-      { x: img.width, y: 0 },          // top-right
-      { x: img.width, y: img.height }, // bottom-right
-      { x: 0, y: img.height },         // bottom-left
+      { x: 0, y: 0 },
+      { x: img.width, y: 0 },
+      { x: img.width, y: img.height },
+      { x: 0, y: img.height },
     ]);
   }, []);
 
@@ -33,15 +33,12 @@ function FreeformCropper({ src, onCropChange }) {
     else img.onload = initCorners;
   }, [src, initCorners]);
 
-  // Drag logic
   const startDrag = (index) => (e) => {
     e.preventDefault();
     setDraggingIndex(index);
   };
 
-  const stopDrag = React.useCallback(() => {
-    setDraggingIndex(null);
-  }, []);
+  const stopDrag = React.useCallback(() => setDraggingIndex(null), []);
 
   const onDrag = React.useCallback(
     (e) => {
@@ -77,7 +74,6 @@ function FreeformCropper({ src, onCropChange }) {
     };
   }, [onDrag, stopDrag]);
 
-  // Crop function
   const handleCrop = () => {
     if (!imgRef.current) return;
     const canvas = document.createElement("canvas");
@@ -109,26 +105,17 @@ function FreeformCropper({ src, onCropChange }) {
     onCropChange(canvas.toDataURL("image/png"));
   };
 
-  // Magnifier positions
+  // Magnifier background and position (allow blank space)
   const imgWidth = imgRef.current ? imgRef.current.width : 0;
   const imgHeight = imgRef.current ? imgRef.current.height : 0;
 
-  const bgX = Math.max(0, Math.min(dragPos.x * zoom - magnifierSize / 2, imgWidth * zoom - magnifierSize));
-  const bgY = Math.max(0, Math.min(dragPos.y * zoom - magnifierSize / 2, imgHeight * zoom - magnifierSize));
+  // Calculate bg position so that magnifier shows blank areas if outside image
+  let bgX = dragPos.x * zoom - magnifierSize / 2;
+  let bgY = dragPos.y * zoom - magnifierSize / 2;
 
-  const magLeft =
-    dragPos.x < magnifierSize / 2
-      ? 0
-      : dragPos.x > imgWidth - magnifierSize / 2
-      ? imgWidth - magnifierSize
-      : dragPos.x - magnifierSize / 2;
-
-  const magTop =
-    dragPos.y < magnifierSize / 2
-      ? 0
-      : dragPos.y > imgHeight - magnifierSize / 2
-      ? imgHeight - magnifierSize
-      : dragPos.y - magnifierSize / 2;
+  // Magnifier position relative to handle
+  const magLeft = dragPos.x - magnifierSize / 2;
+  const magTop = dragPos.y - magnifierSize / 2;
 
   return (
     <div ref={containerRef} className="relative inline-block w-full">
@@ -158,10 +145,7 @@ function FreeformCropper({ src, onCropChange }) {
             onMouseDown={startDrag(idx)}
             onTouchStart={startDrag(idx)}
             className="absolute w-4 h-4 bg-blue-600 rounded-full cursor-grab"
-            style={{
-              left: corner.x - 8,
-              top: corner.y - 8,
-            }}
+            style={{ left: corner.x - 8, top: corner.y - 8 }}
           />
         ))}
 

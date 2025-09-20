@@ -3,6 +3,113 @@
 import { useState } from "react";
 import jsPDF from "jspdf";
 
+// Reusable Freeform Cropper Component
+interface Point { x: number; y: number; }
+interface CropperProps { src: string; onCropChange: (croppedDataUrl: string) => void; }
+
+function FreeformCropper({ src, onCropChange }: CropperProps) {
+  const [corners, setCorners] = useState<Point[]>([
+    { x: 50, y: 50 },
+    { x: 250, y: 50 },
+    { x: 250, y: 250 },
+    { x: 50, y: 250 },
+  ]);
+
+  const [dragging, setDragging] = useState<number | null>(null);
+  const imgRef = React.useRef<HTMLImageElement>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  const startDrag = (index: number) => (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    setDragging(index);
+  };
+  const stopDrag = () => setDragging(null);
+
+  const onDrag = (e: MouseEvent | TouchEvent) => {
+    if (dragging === null || !containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    let clientX = "clientX" in e ? e.clientX : e.touches[0].clientX;
+    let clientY = "clientY" in e ? e.clientY : e.touches[0].clientY;
+
+    const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
+    const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
+
+    setCorners((prev) => prev.map((c, i) => (i === dragging ? { x, y } : c)));
+  };
+
+  React.useEffect(() => {
+    window.addEventListener("mousemove", onDrag);
+    window.addEventListener("mouseup", stopDrag);
+    window.addEventListener("touchmove", onDrag);
+    window.addEventListener("touchend", stopDrag);
+    return () => {
+      window.removeEventListener("mousemove", onDrag);
+      window.removeEventListener("mouseup", stopDrag);
+      window.removeEventListener("touchmove", onDrag);
+      window.removeEventListener("touchend", stopDrag);
+    };
+  }, [dragging]);
+
+  const handleCrop = () => {
+    if (!imgRef.current) return;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const xs = corners.map((p) => p.x);
+    const ys = corners.map((p) => p.y);
+    const width = Math.max(...xs) - Math.min(...xs);
+    const height = Math.max(...ys) - Math.min(...ys);
+
+    canvas.width = width;
+    canvas.height = height;
+
+    ctx.drawImage(
+      imgRef.current,
+      Math.min(...xs),
+      Math.min(...ys),
+      width,
+      height,
+      0,
+      0,
+      width,
+      height
+    );
+
+    const dataUrl = canvas.toDataURL("image/png");
+    onCropChange(dataUrl);
+  };
+
+  return (
+    <div ref={containerRef} className="relative inline-block w-full">
+      <img src={src} ref={imgRef} className="block w-full rounded-xl border border-blue-300" />
+      <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
+        <polygon
+          points={corners.map((p) => `${p.x},${p.y}`).join(" ")}
+          fill="rgba(59,130,246,0.2)"
+          stroke="rgba(59,130,246,0.8)"
+          strokeWidth={2}
+        />
+      </svg>
+      {corners.map((corner, idx) => (
+        <div
+          key={idx}
+          onMouseDown={startDrag(idx)}
+          onTouchStart={startDrag(idx)}
+          className="absolute w-4 h-4 bg-blue-600 rounded-full cursor-grab"
+          style={{ left: corner.x - 8, top: corner.y - 8 }}
+        />
+      ))}
+      <button
+        onClick={handleCrop}
+        className="mt-2 bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-2 px-4 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
+      >
+        Crop
+      </button>
+    </div>
+  )
+  
 export default function CivilIdPage() {
   const [frontFile, setFrontFile] = useState(null);
   const [backFile, setBackFile] = useState(null);
@@ -166,11 +273,20 @@ const downloadPDF = () => {
   {error && <p className="text-red-600 font-semibold">{error}</p>}
 </div>
 
-      {(frontPreview || backPreview) && (
-        <div className="mt-8 flex flex-col items-center gap-4 w-full max-w-xl">
-          <h2 className="text-2xl font-semibold text-blue-900">Preview:</h2>
-          {frontPreview && <img src={frontPreview} alt="Front" className="border border-blue-300 shadow-md rounded-xl" />}
-          {backPreview && <img src={backPreview} alt="Back" className="border border-blue-300 shadow-md rounded-xl" />}
+  {(frontPreview || backPreview) && (
+        <div className="mt-8 flex flex-col items-center gap-6 w-full max-w-xl">
+          {frontPreview && (
+            <div>
+              <h2 className="text-2xl font-semibold text-blue-900 mb-2">Front Side:</h2>
+              <FreeformCropper src={frontPreview} onCropChange={setFrontPreview} />
+            </div>
+          )}
+          {backPreview && (
+            <div>
+              <h2 className="text-2xl font-semibold text-blue-900 mb-2">Back Side:</h2>
+              <FreeformCropper src={backPreview} onCropChange={setBackPreview} />
+            </div>
+          )}
           <button
             onClick={downloadPDF}
             className="bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
@@ -179,6 +295,3 @@ const downloadPDF = () => {
           </button>
         </div>
       )}
-    </div>
-  );
-}

@@ -77,7 +77,7 @@ const downloadPDF = () => {
       const maxImgHeight = (availableHeight - spacing) / 2 * 0.7; // reduce by 30%
       
       // Front image size
-      let frontRatio = frontImg.width / frontImg.height;
+      const frontRatio = frontImg.width / frontImg.height;
       let frontHeight = maxImgHeight;
       let frontWidth = frontHeight * frontRatio;
       if (frontWidth > a4Width - margin * 2) {
@@ -88,7 +88,7 @@ const downloadPDF = () => {
       const frontY = margin + (availableHeight / 2 - frontHeight - spacing/2) / 2;
 
       // Back image size
-      let backRatio = backImg.width / backImg.height;
+      const backRatio = backImg.width / backImg.height;
       let backHeight = maxImgHeight;
       let backWidth = backHeight * backRatio;
       if (backWidth > a4Width - margin * 2) {

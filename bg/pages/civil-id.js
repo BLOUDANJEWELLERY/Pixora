@@ -11,8 +11,9 @@ export default function CivilIdPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: "front" | "back") => {
-    const file = e.target.files?.[0];
+  :
+const handleFileChange = (e, type) => { ... }
+  const file = e.target.files?.[0];
     if (!file) return;
     if (type === "front") {
       setFrontFile(file);

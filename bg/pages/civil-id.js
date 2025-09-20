@@ -10,14 +10,18 @@ function FreeformCropper({ src, onCropChange }) {
   const imgRef = useRef(null);
   const containerRef = useRef(null);
 
+  const magnifierSize = 100;
+  const zoom = 2;
+
+  // Initialize corners at image edges
   const initCorners = () => {
     if (!imgRef.current) return;
     const img = imgRef.current;
     setCorners([
-      { x: 0, y: 0 },
-      { x: img.width, y: 0 },
-      { x: img.width, y: img.height },
-      { x: 0, y: img.height },
+      { x: 0, y: 0 },                 // top-left
+      { x: img.width, y: 0 },         // top-right
+      { x: img.width, y: img.height },// bottom-right
+      { x: 0, y: img.height },        // bottom-left
     ]);
   };
 
@@ -32,24 +36,25 @@ function FreeformCropper({ src, onCropChange }) {
     e.preventDefault();
     setDraggingIndex(index);
   };
+
   const stopDrag = () => setDraggingIndex(null);
 
-const onDrag = (e) => {
-  if (draggingIndex === null || !containerRef.current) return;
-  const rect = containerRef.current.getBoundingClientRect();
-  const clientX = e.clientX ?? e.touches?.[0]?.clientX;
-  const clientY = e.clientY ?? e.touches?.[0]?.clientY;
+  const onDrag = (e) => {
+    if (draggingIndex === null || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const clientX = e.clientX ?? e.touches?.[0]?.clientX;
+    const clientY = e.clientY ?? e.touches?.[0]?.clientY;
 
-  // Clamp handle CENTER, not edge
-  const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
-  const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
+    // Clamp handle strictly inside the image
+    const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
+    const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
 
-  setDragPos({ x, y });
+    setDragPos({ x, y });
 
-  setCorners((prev) =>
-    prev.map((c, i) => (i === draggingIndex ? { x, y } : c))
-  );
-};
+    setCorners((prev) =>
+      prev.map((c, i) => (i === draggingIndex ? { x, y } : c))
+    );
+  };
 
   useEffect(() => {
     window.addEventListener("mousemove", onDrag);
@@ -94,15 +99,9 @@ const onDrag = (e) => {
     onCropChange(canvas.toDataURL("image/png"));
   };
 
-const bgX = Math.min(
-    Math.max(dragPos.x * zoom - magSize / 2, 0),
-    img.width * zoom - magSize
-);
-
-const bgY = Math.min(
-    Math.max(dragPos.y * zoom - magSize / 2, 0),
-    img.height * zoom - magSize
-);
+  // Calculate magnifier background position
+  const bgX = dragPos.x * zoom - magnifierSize / 2;
+  const bgY = dragPos.y * zoom - magnifierSize / 2;
 
   return (
     <div ref={containerRef} className="relative inline-block w-full">
@@ -115,7 +114,7 @@ const bgY = Math.min(
           alt="To crop"
         />
 
-        {/* Polygon */}
+        {/* Polygon overlay */}
         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
           <polygon
             points={corners.map((p) => `${p.x},${p.y}`).join(" ")}
@@ -132,42 +131,45 @@ const bgY = Math.min(
             onMouseDown={startDrag(idx)}
             onTouchStart={startDrag(idx)}
             className="absolute w-4 h-4 bg-blue-600 rounded-full cursor-grab"
-            style={{ left: corner.x - 8, top: corner.y - 8 }}
+            style={{
+              left: corner.x - 8,
+              top: corner.y - 8,
+            }}
           />
         ))}
 
-        {/* Magnifier Preview */}
-{/* Magnifier Preview */}
-{draggingIndex !== null && imgRef.current && (
-  <div
-    className="absolute border-2 border-blue-500 rounded-full overflow-hidden pointer-events-none bg-white"
-    style={{
-      // Decide position dynamically
-      left:
-        dragPos.x < 60
-          ? dragPos.x + 20 // if too close to left, push right
-          : dragPos.x - 120, // default: show on left
-      top:
-        dragPos.y < 60
-          ? dragPos.y + 20 // if too close to top, push below
-          : dragPos.y - 120, // default: show above
-      width: 100,
-      height: 100,
-      backgroundImage: `url(${src})`,
-      backgroundSize: `${imgRef.current.width * 2}px ${imgRef.current.height * 2}px`,
-      backgroundPosition: `-${bgX}px -${bgY}px`,
-      backgroundRepeat: "no-repeat",
-      backgroundColor: "white",
-    }}
-  >
-    {/* Crosshair */}
-    <div className="absolute inset-0 flex items-center justify-center">
-      <div className="absolute w-0.5 h-6 bg-red-500" />
-      <div className="absolute w-6 h-0.5 bg-red-500" />
-    </div>
-  </div>
-)}
-</div>
+        {/* Magnifier */}
+        {draggingIndex !== null && imgRef.current && (
+          <div
+            className="absolute border-2 border-blue-500 rounded-full overflow-hidden pointer-events-none bg-white"
+            style={{
+              left:
+                dragPos.x < magnifierSize / 2
+                  ? dragPos.x
+                  : dragPos.x - magnifierSize,
+              top:
+                dragPos.y < magnifierSize / 2
+                  ? dragPos.y
+                  : dragPos.y - magnifierSize,
+              width: magnifierSize,
+              height: magnifierSize,
+              backgroundImage: `url(${src})`,
+              backgroundSize: `${imgRef.current.width * zoom}px ${
+                imgRef.current.height * zoom
+              }px`,
+              backgroundPosition: `-${bgX}px -${bgY}px`,
+              backgroundRepeat: "no-repeat",
+              backgroundColor: "white",
+            }}
+          >
+            {/* Crosshair */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute w-0.5 h-6 bg-red-500" />
+              <div className="absolute w-6 h-0.5 bg-red-500" />
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Rotation Slider */}
       <div className="flex justify-center mt-4">

@@ -1,17 +1,15 @@
-// pages/civil-id.js:
 "use client";
 import jsPDF from "jspdf";
 import React, { useState, useRef, useEffect } from "react";
 
-export default function FreeformCropper({ src, onCropChange }) {
-  // Initial corner points
+// Freeform Cropper Component
+function FreeformCropper({ src, onCropChange }) {
   const [corners, setCorners] = useState([
     { x: 50, y: 50 },
     { x: 250, y: 50 },
     { x: 250, y: 250 },
     { x: 50, y: 250 },
   ]);
-
   const [draggingIndex, setDraggingIndex] = useState(null);
   const imgRef = useRef(null);
   const containerRef = useRef(null);
@@ -25,7 +23,6 @@ export default function FreeformCropper({ src, onCropChange }) {
 
   const onDrag = (e) => {
     if (draggingIndex === null || !containerRef.current) return;
-
     const rect = containerRef.current.getBoundingClientRect();
     const clientX = e.clientX !== undefined ? e.clientX : e.touches[0].clientX;
     const clientY = e.clientY !== undefined ? e.clientY : e.touches[0].clientY;
@@ -61,12 +58,10 @@ export default function FreeformCropper({ src, onCropChange }) {
 
     const xs = corners.map((p) => p.x);
     const ys = corners.map((p) => p.y);
-
     const minX = Math.min(...xs);
     const minY = Math.min(...ys);
     const maxX = Math.max(...xs);
     const maxY = Math.max(...ys);
-
     const width = maxX - minX;
     const height = maxY - minY;
 
@@ -74,9 +69,7 @@ export default function FreeformCropper({ src, onCropChange }) {
     canvas.height = height;
 
     ctx.drawImage(imgRef.current, minX, minY, width, height, 0, 0, width, height);
-
-    const dataUrl = canvas.toDataURL("image/png");
-    onCropChange(dataUrl);
+    onCropChange(canvas.toDataURL("image/png"));
   };
 
   return (
@@ -87,7 +80,6 @@ export default function FreeformCropper({ src, onCropChange }) {
         className="block w-full rounded-xl border border-blue-300"
         alt="To crop"
       />
-      {/* Polygon overlay */}
       <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
         <polygon
           points={corners.map((p) => `${p.x},${p.y}`).join(" ")}
@@ -96,7 +88,6 @@ export default function FreeformCropper({ src, onCropChange }) {
           strokeWidth={2}
         />
       </svg>
-      {/* Draggable corners */}
       {corners.map((corner, idx) => (
         <div
           key={idx}
@@ -116,6 +107,7 @@ export default function FreeformCropper({ src, onCropChange }) {
   );
 }
 
+// Main Civil ID Page
 export default function CivilIdPage() {
   const [frontFile, setFrontFile] = useState(null);
   const [backFile, setBackFile] = useState(null);
@@ -128,12 +120,13 @@ export default function CivilIdPage() {
   const handleFileChange = (e, type) => {
     const file = e.target.files[0];
     if (!file) return;
+    const previewUrl = URL.createObjectURL(file);
     if (type === "front") {
       setFrontFile(file);
-      setFrontPreview(URL.createObjectURL(file));
+      setFrontPreview(previewUrl);
     } else {
       setBackFile(file);
-      setBackPreview(URL.createObjectURL(file));
+      setBackPreview(previewUrl);
     }
   };
 
@@ -151,16 +144,15 @@ export default function CivilIdPage() {
       formData.append("front", frontFile);
       formData.append("back", backFile);
 
-      const res = await fetch("https://civil-id-server.onrender.com/process-civil-id", {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch(
+        "https://civil-id-server.onrender.com/process-civil-id",
+        { method: "POST", body: formData }
+      );
 
       if (!res.ok) throw new Error("Server error");
 
       const data = await res.json();
 
-      // Decode base64 directly into image URLs
       setFrontPreview(`data:image/jpeg;base64,${data.front}`);
       setBackPreview(`data:image/jpeg;base64,${data.back}`);
     } catch (e) {
@@ -170,117 +162,110 @@ export default function CivilIdPage() {
     setLoading(false);
   };
 
-const downloadPDF = () => {
-  if (!frontPreview || !backPreview) return;
+  const downloadPDF = () => {
+    if (!frontPreview || !backPreview) return;
 
-  const pdf = new jsPDF("p", "pt", "a4");
-  const a4Width = 595;   // pt
-  const a4Height = 842;  // pt
-  const margin = 20;
+    const pdf = new jsPDF("p", "pt", "a4");
+    const a4Width = 595;
+    const a4Height = 842;
+    const margin = 20;
 
-  const frontImg = new Image();
-  const backImg = new Image();
-  frontImg.src = frontPreview;
-  backImg.src = backPreview;
+    const frontImg = new Image();
+    const backImg = new Image();
+    frontImg.src = frontPreview;
+    backImg.src = backPreview;
 
-  frontImg.onload = () => {
-    backImg.onload = () => {
-      // Calculate available height for both images with spacing
-      const availableHeight = a4Height - margin * 2;
-      const spacing = availableHeight * 0.1; // space between front and back
-      const maxImgHeight = (availableHeight - spacing) / 2 * 0.7; // reduce by 30%
-      
-      // Front image size
-      let frontRatio = frontImg.width / frontImg.height;
-      let frontHeight = maxImgHeight;
-      let frontWidth = frontHeight * frontRatio;
-      if (frontWidth > a4Width - margin * 2) {
-        frontWidth = a4Width - margin * 2;
-        frontHeight = frontWidth / frontRatio;
-      }
-      const frontX = (a4Width - frontWidth) / 2;
-      const frontY = margin + (availableHeight / 2 - frontHeight - spacing/2) / 2;
+    frontImg.onload = () => {
+      backImg.onload = () => {
+        const availableHeight = a4Height - margin * 2;
+        const spacing = availableHeight * 0.1;
+        const maxImgHeight = (availableHeight - spacing) / 2 * 0.7;
 
-      // Back image size
-      let backRatio = backImg.width / backImg.height;
-      let backHeight = maxImgHeight;
-      let backWidth = backHeight * backRatio;
-      if (backWidth > a4Width - margin * 2) {
-        backWidth = a4Width - margin * 2;
-        backHeight = backWidth / backRatio;
-      }
-      const backX = (a4Width - backWidth) / 2;
-      const backY = frontY + frontHeight + spacing;
+        let frontRatio = frontImg.width / frontImg.height;
+        let frontHeight = maxImgHeight;
+        let frontWidth = frontHeight * frontRatio;
+        if (frontWidth > a4Width - margin * 2) {
+          frontWidth = a4Width - margin * 2;
+          frontHeight = frontWidth / frontRatio;
+        }
+        const frontX = (a4Width - frontWidth) / 2;
+        const frontY = margin + (availableHeight / 2 - frontHeight - spacing/2) / 2;
 
-      // White background
-      pdf.setFillColor(255, 255, 255);
-      pdf.rect(0, 0, a4Width, a4Height, "F");
+        let backRatio = backImg.width / backImg.height;
+        let backHeight = maxImgHeight;
+        let backWidth = backHeight * backRatio;
+        if (backWidth > a4Width - margin * 2) {
+          backWidth = a4Width - margin * 2;
+          backHeight = backWidth / backRatio;
+        }
+        const backX = (a4Width - backWidth) / 2;
+        const backY = frontY + frontHeight + spacing;
 
-      // Add images
-      pdf.addImage(frontImg, "JPEG", frontX, frontY, frontWidth, frontHeight);
-      pdf.addImage(backImg, "JPEG", backX, backY, backWidth, backHeight);
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(0, 0, a4Width, a4Height, "F");
 
-      // Watermark if any
-      if (watermark) {
-        pdf.setTextColor(180, 180, 180);
-        pdf.setFontSize(50);
-        pdf.text(watermark, a4Width / 2, a4Height / 2, { align: "center", angle: -45 });
-      }
+        pdf.addImage(frontImg, "JPEG", frontX, frontY, frontWidth, frontHeight);
+        pdf.addImage(backImg, "JPEG", backX, backY, backWidth, backHeight);
 
-      pdf.save("civil-id.pdf");
+        if (watermark) {
+          pdf.setTextColor(180, 180, 180);
+          pdf.setFontSize(50);
+          pdf.text(watermark, a4Width / 2, a4Height / 2, { align: "center", angle: -45 });
+        }
+
+        pdf.save("civil-id.pdf");
+      };
     };
   };
-};
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
       <h1 className="text-4xl font-bold text-blue-900 mb-8">Civil ID Processor</h1>
 
-    <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30">
-  <div>
-    <label className="font-semibold text-blue-900">Upload Front Side:</label>
-    <input
-      type="file"
-      accept="image/*"
-      onChange={(e) => handleFileChange(e, "front")}
-      className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full"
-    />
-  </div>
+      <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30">
+        <div>
+          <label className="font-semibold text-blue-900">Upload Front Side:</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleFileChange(e, "front")}
+            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full"
+          />
+        </div>
 
-  <div>
-    <label className="font-semibold text-blue-900">Upload Back Side:</label>
-    <input
-      type="file"
-      accept="image/*"
-      onChange={(e) => handleFileChange(e, "back")}
-      className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full"
-    />
-  </div>
+        <div>
+          <label className="font-semibold text-blue-900">Upload Back Side:</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleFileChange(e, "back")}
+            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full"
+          />
+        </div>
 
-  <div>
-    <label className="font-semibold text-blue-900">Optional Watermark:</label>
-    <input
-      type="text"
-      placeholder="Enter watermark text"
-      value={watermark}
-      onChange={(e) => setWatermark(e.target.value)}
-      className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full"
-    />
-  </div>
+        <div>
+          <label className="font-semibold text-blue-900">Optional Watermark:</label>
+          <input
+            type="text"
+            placeholder="Enter watermark text"
+            value={watermark}
+            onChange={(e) => setWatermark(e.target.value)}
+            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full"
+          />
+        </div>
 
-  <button
-    onClick={processCivilID}
-    disabled={loading}
-    className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 w-full"
-  >
-    {loading ? "Processing Civil ID..." : "Process Civil ID"}
-  </button>
+        <button
+          onClick={processCivilID}
+          disabled={loading}
+          className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 w-full"
+        >
+          {loading ? "Processing Civil ID..." : "Process Civil ID"}
+        </button>
 
-  {error && <p className="text-red-600 font-semibold">{error}</p>}
-</div>
+        {error && <p className="text-red-600 font-semibold">{error}</p>}
+      </div>
 
-
-  {(frontPreview || backPreview) && (
+      {(frontPreview || backPreview) && (
         <div className="mt-8 flex flex-col items-center gap-6 w-full max-w-xl">
           {frontPreview && (
             <div>
@@ -302,7 +287,6 @@ const downloadPDF = () => {
           </button>
         </div>
       )}
-      
-      </div>
-      );
-      }
+    </div>
+  );
+}

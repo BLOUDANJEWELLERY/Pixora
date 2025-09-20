@@ -1,179 +1,154 @@
 "use client";
-import { useState } from "react";
+
+import { useState, useRef } from "react";
 import jsPDF from "jspdf";
 
-export default function CivilIdPage() {
-  const [frontFile, setFrontFile] = useState(null);
-  const [backFile, setBackFile] = useState(null);
-  const [frontPreview, setFrontPreview] = useState(null);
-  const [backPreview, setBackPreview] = useState(null);
-  const [watermark, setWatermark] = useState("");
+export default function CivilIdPDF() {
+  const [frontFile, setFrontFile] = useState<File | null>(null);
+  const [backFile, setBackFile] = useState<File | null>(null);
+  const [frontPreview, setFrontPreview] = useState<string | null>(null);
+  const [backPreview, setBackPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  const handleFileChange = (e, type) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (type === "front") {
-      setFrontFile(file);
-      setFrontPreview(URL.createObjectURL(file));
-    } else {
-      setBackFile(file);
-      setBackPreview(URL.createObjectURL(file));
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: "front" | "back") => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (type === "front") {
+          setFrontFile(file);
+          setFrontPreview(reader.result as string);
+        } else {
+          setBackFile(file);
+          setBackPreview(reader.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  const processCivilID = async () => {
-    if (!frontFile || !backFile) {
-      setError("Please upload both front and back images.");
-      return;
-    }
-
-    setError(null);
+  const generatePDF = () => {
+    if (!frontPreview) return;
     setLoading(true);
 
-    try {
-      const formData = new FormData();
-      formData.append("front", frontFile);
-      formData.append("back", backFile);
+    const doc = new jsPDF("p", "mm", "a4");
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    const imgWidth = pageWidth - 2 * margin;
+    const imgHeight = imgWidth * 0.6; // approximate ID ratio
 
-      const res = await fetch("https://civil-id-server.onrender.com/process-civil-id", {
-        method: "POST",
-        body: formData,
-      });
+    const drawImageRounded = (imgSrc: string, x: number, y: number, w: number, h: number, radius: number) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-      if (!res.ok) throw new Error("Server error");
+      const img = new Image();
+      img.src = imgSrc;
+      img.onload = () => {
+        ctx.clearRect(0, 0, w, h);
+        // Rounded rectangle clip
+        ctx.beginPath();
+        ctx.moveTo(radius, 0);
+        ctx.lineTo(w - radius, 0);
+        ctx.quadraticCurveTo(w, 0, w, radius);
+        ctx.lineTo(w, h - radius);
+        ctx.quadraticCurveTo(w, h, w - radius, h);
+        ctx.lineTo(radius, h);
+        ctx.quadraticCurveTo(0, h, 0, h - radius);
+        ctx.lineTo(0, radius);
+        ctx.quadraticCurveTo(0, 0, radius, 0);
+        ctx.closePath();
+        ctx.clip();
 
-      const data = await res.json();
+        ctx.drawImage(img, 0, 0, w, h);
 
-      // Decode base64 directly into image URLs
-      setFrontPreview(`data:image/jpeg;base64,${data.front}`);
-      setBackPreview(`data:image/jpeg;base64,${data.back}`);
-    } catch (e) {
-      setError("Failed to process Civil ID. Try again.");
-      console.error(e);
-    }
-    setLoading(false);
-  };
+        // Draw watermark
+        ctx.font = "20px Arial";
+        ctx.fillStyle = "rgba(0,0,0,0.2)";
+        ctx.textAlign = "right";
+        ctx.fillText("Pixora", w - 10, h - 10);
 
-const downloadPDF = () => {
-  if (!frontPreview || !backPreview) return;
+        const imgData = canvas.toDataURL("image/png");
+        doc.addImage(imgData, "PNG", x, y, w, h);
 
-  const pdf = new jsPDF("p", "pt", "a4");
-  const a4Width = 595;   // pt
-  const a4Height = 842;  // pt
-  const margin = 20;
-
-  const frontImg = new Image();
-  const backImg = new Image();
-  frontImg.src = frontPreview;
-  backImg.src = backPreview;
-
-  frontImg.onload = () => {
-    backImg.onload = () => {
-      // Calculate available height for both images with spacing
-      const availableHeight = a4Height - margin * 2;
-      const spacing = availableHeight * 0.1; // space between front and back
-      const maxImgHeight = (availableHeight - spacing) / 2 * 0.7; // reduce by 30%
-      
-      // Front image size
-      let frontRatio = frontImg.width / frontImg.height;
-      let frontHeight = maxImgHeight;
-      let frontWidth = frontHeight * frontRatio;
-      if (frontWidth > a4Width - margin * 2) {
-        frontWidth = a4Width - margin * 2;
-        frontHeight = frontWidth / frontRatio;
-      }
-      const frontX = (a4Width - frontWidth) / 2;
-      const frontY = margin + (availableHeight / 2 - frontHeight - spacing/2) / 2;
-
-      // Back image size
-      let backRatio = backImg.width / backImg.height;
-      let backHeight = maxImgHeight;
-      let backWidth = backHeight * backRatio;
-      if (backWidth > a4Width - margin * 2) {
-        backWidth = a4Width - margin * 2;
-        backHeight = backWidth / backRatio;
-      }
-      const backX = (a4Width - backWidth) / 2;
-      const backY = frontY + frontHeight + spacing;
-
-      // White background
-      pdf.setFillColor(255, 255, 255);
-      pdf.rect(0, 0, a4Width, a4Height, "F");
-
-      // Add images
-      pdf.addImage(frontImg, "JPEG", frontX, frontY, frontWidth, frontHeight);
-      pdf.addImage(backImg, "JPEG", backX, backY, backWidth, backHeight);
-
-      // Watermark if any
-      if (watermark) {
-        pdf.setTextColor(180, 180, 180);
-        pdf.setFontSize(50);
-        pdf.text(watermark, a4Width / 2, a4Height / 2, { align: "center", angle: -45 });
-      }
-
-      pdf.save("civil-id.pdf");
+        if (type === "back" && backPreview) {
+          doc.addPage();
+          drawImageRounded(backPreview, margin, margin, imgWidth, imgHeight, 15);
+        } else {
+          doc.save("civil-id.pdf");
+          setLoading(false);
+        }
+      };
     };
+
+    drawImageRounded(frontPreview, margin, margin, imgWidth, imgHeight, 15);
   };
-};
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
-      <h1 className="text-4xl font-bold text-blue-900 mb-8">Civil ID Processor</h1>
+      <h1 className="text-4xl md:text-5xl font-extrabold text-blue-900 mb-10 text-center drop-shadow-lg tracking-wide">
+        Civil ID PDF Maker
+      </h1>
 
+      {/* Upload Card */}
       <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30">
-        <div>
-          <label className="font-semibold text-blue-900">Upload Front Side:</label>
+        <div className="flex flex-col gap-4">
+          <label className="font-semibold text-blue-900">Front Image:</label>
           <input
             type="file"
             accept="image/*"
             onChange={(e) => handleFileChange(e, "front")}
-            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70"
+            className="p-2 border rounded-lg border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/60 w-full"
           />
-        </div>
-        <div>
-          <label className="font-semibold text-blue-900">Upload Back Side:</label>
+
+          <label className="font-semibold text-blue-900">Back Image (optional):</label>
           <input
             type="file"
             accept="image/*"
             onChange={(e) => handleFileChange(e, "back")}
-            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70"
+            className="p-2 border rounded-lg border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/60 w-full"
           />
         </div>
-        <div>
-          <label className="font-semibold text-blue-900">Optional Watermark:</label>
-          <input
-            type="text"
-            placeholder="Enter watermark text"
-            value={watermark}
-            onChange={(e) => setWatermark(e.target.value)}
-            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full"
-          />
-        </div>
-        <button
-          onClick={processCivilID}
-          disabled={loading}
-          className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
-        >
-          {loading ? "Processing Civil ID..." : "Process Civil ID"}
-        </button>
-        {error && <p className="text-red-600 font-semibold">{error}</p>}
+
+        {(frontPreview || backPreview) && (
+          <button
+            onClick={generatePDF}
+            disabled={loading}
+            className={`relative overflow-hidden bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-bold py-3 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            {loading ? "Downloading..." : "Generate PDF"}
+          </button>
+        )}
       </div>
 
-      {(frontPreview || backPreview) && (
-        <div className="mt-8 flex flex-col items-center gap-4 w-full max-w-xl">
-          <h2 className="text-2xl font-semibold text-blue-900">Preview:</h2>
-          {frontPreview && <img src={frontPreview} alt="Front" className="border border-blue-300 shadow-md rounded-xl" />}
-          {backPreview && <img src={backPreview} alt="Back" className="border border-blue-300 shadow-md rounded-xl" />}
-          <button
-            onClick={downloadPDF}
-            className="bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
-          >
-            Download PDF
-          </button>
-        </div>
-      )}
+      {/* Live Preview */}
+      <div className="mt-10 flex flex-col items-center gap-6 w-full max-w-xl">
+        {frontPreview && (
+          <div className="bg-white/40 p-6 rounded-3xl shadow-xl w-full flex flex-col items-center">
+            <h2 className="text-2xl font-semibold text-blue-900 mb-4">Front Preview</h2>
+            <img
+              src={frontPreview}
+              alt="Front Preview"
+              className="rounded-2xl border border-blue-300 max-w-full"
+            />
+          </div>
+        )}
+        {backPreview && (
+          <div className="bg-white/40 p-6 rounded-3xl shadow-xl w-full flex flex-col items-center">
+            <h2 className="text-2xl font-semibold text-blue-900 mb-4">Back Preview</h2>
+            <img
+              src={backPreview}
+              alt="Back Preview"
+              className="rounded-2xl border border-blue-300 max-w-full"
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -206,7 +206,7 @@ function FreeformCropper({ src, onCropChange }) {
         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
           <polygon
             points={corners.map((p) => `${p.x},${p.y}`).join(" ")}
-            fill="none"  {/* Changed to transparent */}
+            fill="none"
             stroke="rgba(59,130,246,0.8)"
             strokeWidth={2}
           />

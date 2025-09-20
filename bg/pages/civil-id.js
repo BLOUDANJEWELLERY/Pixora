@@ -341,7 +341,7 @@ const handleCropChange = (dataUrl, type) => {
   </div>
 )}
 
-// Cropper Overlay
+
 {editingImage && (
   <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6">
     <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full">

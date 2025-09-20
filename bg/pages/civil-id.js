@@ -109,49 +109,41 @@ function FreeformCropper({ src, onCropChange }) {
 
   const stopDrag = React.useCallback(() => setDraggingIndex(null), []);
 
- const onDrag = React.useCallback(
-  (e) => {
-    if (draggingIndex === null || !containerRef.current || !imgRef.current) return;
+  const onDrag = React.useCallback(
+    (e) => {
+      if (draggingIndex === null || !containerRef.current || !imgRef.current) return;
+      
+      const rect = containerRef.current.getBoundingClientRect();
+      const clientX = e.clientX !== undefined ? e.clientX : e.touches?.[0]?.clientX;
+      const clientY = e.clientY !== undefined ? e.clientY : e.touches?.[0]?.clientY;
+      if (clientX === undefined || clientY === undefined) return;
+
+      // Clamp handle strictly inside image
+      const x = Math.min(Math.max(clientX - rect.left, 0), imgRef.current.width);
+      const y = Math.min(Math.max(clientY - rect.top, 0), imgRef.current.height);
+
+      setDragPos({ x, y });
+
+      setCorners((prev) =>
+        prev.map((c, i) => (i === draggingIndex ? { x, y } : c))
+      );
+    },
+    [draggingIndex]
+  );
+
+  React.useEffect(() => {
+    window.addEventListener("mousemove", onDrag);
+    window.addEventListener("mouseup", stopDrag);
+    window.addEventListener("touchmove", onDrag, { passive: false });
+    window.addEventListener("touchend", stopDrag);
     
-    // Prevent default for touch events
-    if (e.type === 'touchmove') {
-      e.preventDefault();
-    }
-    
-    const rect = containerRef.current.getBoundingClientRect();
-    const clientX = e.clientX !== undefined ? e.clientX : e.touches?.[0]?.clientX;
-    const clientY = e.clientY !== undefined ? e.clientY : e.touches?.[0]?.clientY;
-    if (clientX === undefined || clientY === undefined) return;
-
-    // Clamp handle strictly inside image
-    const x = Math.min(Math.max(clientX - rect.left, 0), imgRef.current.width);
-    const y = Math.min(Math.max(clientY - rect.top, 0), imgRef.current.height);
-
-    setDragPos({ x, y });
-
-    setCorners((prev) =>
-      prev.map((c, i) => (i === draggingIndex ? { x, y } : c))
-    );
-  },
-  [draggingIndex]
-);
-
-// Also update the event listeners to use passive: false for touch events
-React.useEffect(() => {
-  const options = { passive: false };
-  
-  window.addEventListener("mousemove", onDrag);
-  window.addEventListener("mouseup", stopDrag);
-  window.addEventListener("touchmove", onDrag, options);
-  window.addEventListener("touchend", stopDrag);
-  
-  return () => {
-    window.removeEventListener("mousemove", onDrag);
-    window.removeEventListener("mouseup", stopDrag);
-    window.removeEventListener("touchmove", onDrag);
-    window.removeEventListener("touchend", stopDrag);
-  };
-}, [onDrag, stopDrag]);
+    return () => {
+      window.removeEventListener("mousemove", onDrag);
+      window.removeEventListener("mouseup", stopDrag);
+      window.removeEventListener("touchmove", onDrag);
+      window.removeEventListener("touchend", stopDrag);
+    };
+  }, [onDrag, stopDrag]);
 
   const handleCrop = () => {
     if (!imgRef.current) return;
@@ -265,7 +257,7 @@ React.useEffect(() => {
           max={180}
           value={rotation}
           onChange={(e) => setRotation(Number(e.target.value))}
-          className="w-1/2 z-1100"
+          className="w-1/2"
         />
       </div>
 
@@ -521,40 +513,42 @@ const handleCropChange = (dataUrl, type) => {
   </div>
 )}
 
-       {/* Modal with touch event prevention */}
-      {editingImage && (
-        <div 
-          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6"
-          style={{ 
-            position: 'fixed', 
-            top: 0, 
-            left: 0, 
-            right: 0, 
-            bottom: 0,
-            overflow: 'hidden',
-            touchAction: 'none' // Disable touch actions
-          }}
-          onTouchMove={(e) => e.preventDefault()} // Prevent touch move events
-        >
-          <div 
-            className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-            onTouchMove={(e) => e.stopPropagation()} // Stop touch events from propagating
-          >
-            <h2 className="text-xl font-semibold text-blue-900 mb-4">Edit Image</h2>
-            <FreeformCropper
-              src={editingImage === "front" ? frontPreview : backPreview}
-              onCropChange={(dataUrl) => handleCropChange(dataUrl, editingImage)}
-            />
-            <button
-              onClick={closeCropper}
-              className="mt-4 bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
+{editingImage && (
+  <div 
+    className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6"
+    style={{ 
+      position: 'fixed', 
+      top: 0, 
+      left: 0, 
+      right: 0, 
+      bottom: 0,
+      overflow: 'hidden'
+    }}
+    onTouchMove={(e) => {
+      // Only prevent default if the touch is on the modal background, not the cropper
+      if (e.target === e.currentTarget) {
+        e.preventDefault();
+      }
+    }}
+  >
+    <div 
+      className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h2 className="text-xl font-semibold text-blue-900 mb-4">Edit Image</h2>
+      <FreeformCropper
+        src={editingImage === "front" ? frontPreview : backPreview}
+        onCropChange={(dataUrl) => handleCropChange(dataUrl, editingImage)}
+      />
+      <button
+        onClick={closeCropper}
+        className="mt-4 bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
+      >
+        Done
+      </button>
+    </div>
+  </div>
+)}
     </div>
   );
 }

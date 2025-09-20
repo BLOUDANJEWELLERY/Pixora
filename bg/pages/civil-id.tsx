@@ -1,31 +1,18 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import jsPDF from "jspdf";
 
 export default function CivilIdPDF() {
-  const [frontFile, setFrontFile] = useState<File | null>(null);
-  const [backFile, setBackFile] = useState<File | null>(null);
   const [frontPreview, setFrontPreview] = useState<string | null>(null);
   const [backPreview, setBackPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: "front" | "back") => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setPreview: (src: string) => void) => {
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
       const reader = new FileReader();
-      reader.onload = () => {
-        if (type === "front") {
-          setFrontFile(file);
-          setFrontPreview(reader.result as string);
-        } else {
-          setBackFile(file);
-          setBackPreview(reader.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      reader.onload = () => setPreview(reader.result as string);
+      reader.readAsDataURL(e.target.files[0]);
     }
   };
 
@@ -35,12 +22,11 @@ export default function CivilIdPDF() {
 
     const doc = new jsPDF("p", "mm", "a4");
     const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 20;
     const imgWidth = pageWidth - 2 * margin;
     const imgHeight = imgWidth * 0.6; // approximate ID ratio
 
-    const drawImageRounded = (imgSrc: string, x: number, y: number, w: number, h: number, radius: number) => {
+    const drawImageRounded = (imgSrc: string, x: number, y: number, w: number, h: number, radius: number, callback?: () => void) => {
       const canvas = document.createElement("canvas");
       canvas.width = w;
       canvas.height = h;
@@ -51,6 +37,7 @@ export default function CivilIdPDF() {
       img.src = imgSrc;
       img.onload = () => {
         ctx.clearRect(0, 0, w, h);
+
         // Rounded rectangle clip
         ctx.beginPath();
         ctx.moveTo(radius, 0);
@@ -67,7 +54,7 @@ export default function CivilIdPDF() {
 
         ctx.drawImage(img, 0, 0, w, h);
 
-        // Draw watermark
+        // Watermark
         ctx.font = "20px Arial";
         ctx.fillStyle = "rgba(0,0,0,0.2)";
         ctx.textAlign = "right";
@@ -76,17 +63,24 @@ export default function CivilIdPDF() {
         const imgData = canvas.toDataURL("image/png");
         doc.addImage(imgData, "PNG", x, y, w, h);
 
-        if (type === "back" && backPreview) {
-          doc.addPage();
-          drawImageRounded(backPreview, margin, margin, imgWidth, imgHeight, 15);
-        } else {
-          doc.save("civil-id.pdf");
-          setLoading(false);
-        }
+        if (callback) callback();
       };
     };
 
-    drawImageRounded(frontPreview, margin, margin, imgWidth, imgHeight, 15);
+    // Draw front
+    drawImageRounded(frontPreview, margin, margin, imgWidth, imgHeight, 15, () => {
+      // If back image exists, add page and draw back
+      if (backPreview) {
+        doc.addPage();
+        drawImageRounded(backPreview, margin, margin, imgWidth, imgHeight, 15, () => {
+          doc.save("civil-id.pdf");
+          setLoading(false);
+        });
+      } else {
+        doc.save("civil-id.pdf");
+        setLoading(false);
+      }
+    });
   };
 
   return (
@@ -102,7 +96,7 @@ export default function CivilIdPDF() {
           <input
             type="file"
             accept="image/*"
-            onChange={(e) => handleFileChange(e, "front")}
+            onChange={(e) => handleFileChange(e, setFrontPreview)}
             className="p-2 border rounded-lg border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/60 w-full"
           />
 
@@ -110,7 +104,7 @@ export default function CivilIdPDF() {
           <input
             type="file"
             accept="image/*"
-            onChange={(e) => handleFileChange(e, "back")}
+            onChange={(e) => handleFileChange(e, setBackPreview)}
             className="p-2 border rounded-lg border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/60 w-full"
           />
         </div>
@@ -119,7 +113,7 @@ export default function CivilIdPDF() {
           <button
             onClick={generatePDF}
             disabled={loading}
-            className={`relative overflow-hidden bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-bold py-3 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] disabled:opacity-50 disabled:cursor-not-allowed`}
+            className={`relative overflow-hidden bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-bold py-3 rounded-2xl shadow-xl mt-4 transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {loading ? "Downloading..." : "Generate PDF"}
           </button>

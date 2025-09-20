@@ -51,7 +51,6 @@ export default function CivilIdPage() {
       setError("Failed to process Civil ID. Try again.");
       console.error(e);
     }
-
     setLoading(false);
   };
 
@@ -62,6 +61,7 @@ export default function CivilIdPage() {
     const a4Width = 595;
     const a4Height = 842;
     const margin = 20;
+    const radius = 20; // rounded corners
 
     const frontImg = new Image();
     const backImg = new Image();
@@ -74,40 +74,36 @@ export default function CivilIdPage() {
         const spacing = availableHeight * 0.1;
         const maxImgHeight = (availableHeight - spacing) / 2 * 0.7;
 
-        // Front image
-        let frontRatio = frontImg.width / frontImg.height;
-        let frontHeight = maxImgHeight;
-        let frontWidth = frontHeight * frontRatio;
-        if (frontWidth > a4Width - margin * 2) {
-          frontWidth = a4Width - margin * 2;
-          frontHeight = frontWidth / frontRatio;
-        }
-        const frontX = (a4Width - frontWidth) / 2;
-        const frontY = margin + (availableHeight / 2 - frontHeight - spacing / 2) / 2;
+        const calcSize = (img: HTMLImageElement) => {
+          let ratio = img.width / img.height;
+          let height = maxImgHeight;
+          let width = height * ratio;
+          if (width > a4Width - margin * 2) {
+            width = a4Width - margin * 2;
+            height = width / ratio;
+          }
+          return { width, height };
+        };
 
-        // Back image
-        let backRatio = backImg.width / backImg.height;
-        let backHeight = maxImgHeight;
-        let backWidth = backHeight * backRatio;
-        if (backWidth > a4Width - margin * 2) {
-          backWidth = a4Width - margin * 2;
-          backHeight = backWidth / backRatio;
-        }
-        const backX = (a4Width - backWidth) / 2;
-        const backY = frontY + frontHeight + spacing;
+        const frontSize = calcSize(frontImg);
+        const backSize = calcSize(backImg);
+
+        const frontX = (a4Width - frontSize.width) / 2;
+        const frontY = margin + (availableHeight / 2 - frontSize.height - spacing / 2) / 2;
+        const backX = (a4Width - backSize.width) / 2;
+        const backY = frontY + frontSize.height + spacing;
 
         pdf.setFillColor(255, 255, 255);
         pdf.rect(0, 0, a4Width, a4Height, "F");
 
         // Draw images with rounded corners
-        const radius = 20;
         const drawRoundedImage = (img: HTMLImageElement, x: number, y: number, w: number, h: number) => {
           pdf.roundedRect(x, y, w, h, radius, radius, "S");
-          pdf.addImage(img, "JPEG", x, y, w, h);
+          pdf.addImage(img, "JPEG", x, y, w, h, undefined, "FAST");
         };
 
-        drawRoundedImage(frontImg, frontX, frontY, frontWidth, frontHeight);
-        drawRoundedImage(backImg, backX, backY, backWidth, backHeight);
+        drawRoundedImage(frontImg, frontX, frontY, frontSize.width, frontSize.height);
+        drawRoundedImage(backImg, backX, backY, backSize.width, backSize.height);
 
         // Watermark
         if (watermark) {
@@ -123,35 +119,35 @@ export default function CivilIdPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
-      <h1 className="text-4xl font-bold text-blue-900 mb-8 text-center">Civil ID Processor</h1>
+      <h1 className="text-4xl font-bold text-blue-900 mb-8">Civil ID Processor</h1>
 
       <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30">
-        <div className="flex flex-col gap-2">
+        <div>
           <label className="font-semibold text-blue-900">Upload Front Side:</label>
           <input
             type="file"
             accept="image/*"
             onChange={(e) => handleFileChange(e, "front")}
-            className="block w-full mt-1 p-2 border rounded-lg border-blue-300 bg-white/70"
+            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full max-w-full"
           />
         </div>
-        <div className="flex flex-col gap-2">
+        <div>
           <label className="font-semibold text-blue-900">Upload Back Side:</label>
           <input
             type="file"
             accept="image/*"
             onChange={(e) => handleFileChange(e, "back")}
-            className="block w-full mt-1 p-2 border rounded-lg border-blue-300 bg-white/70"
+            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full max-w-full"
           />
         </div>
-        <div className="flex flex-col gap-2">
+        <div>
           <label className="font-semibold text-blue-900">Optional Watermark:</label>
           <input
             type="text"
             placeholder="Enter watermark text"
             value={watermark}
             onChange={(e) => setWatermark(e.target.value)}
-            className="block w-full mt-1 p-2 border rounded-lg border-blue-300 bg-white/70"
+            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full max-w-full"
           />
         </div>
         <button
@@ -167,20 +163,8 @@ export default function CivilIdPage() {
       {(frontPreview || backPreview) && (
         <div className="mt-8 flex flex-col items-center gap-4 w-full max-w-xl">
           <h2 className="text-2xl font-semibold text-blue-900">Preview:</h2>
-          {frontPreview && (
-            <img
-              src={frontPreview}
-              alt="Front"
-              className="border border-blue-300 shadow-md rounded-2xl w-full object-contain max-h-64"
-            />
-          )}
-          {backPreview && (
-            <img
-              src={backPreview}
-              alt="Back"
-              className="border border-blue-300 shadow-md rounded-2xl w-full object-contain max-h-64"
-            />
-          )}
+          {frontPreview && <img src={frontPreview} alt="Front" className="border border-blue-300 shadow-md rounded-2xl max-w-full" />}
+          {backPreview && <img src={backPreview} alt="Back" className="border border-blue-300 shadow-md rounded-2xl max-w-full" />}
           <button
             onClick={downloadPDF}
             className="bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"

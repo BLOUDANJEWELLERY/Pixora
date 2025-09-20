@@ -3,61 +3,68 @@ import jsPDF from "jspdf";
 import React, { useState, useRef, useEffect } from "react";
 
 function FreeformCropper({ src, onCropChange }) {
-  const [corners, setCorners] = useState([]);
-  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
-  const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
-  const [rotation, setRotation] = useState(0);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [corners, setCorners] = React.useState([]);
+  const [draggingIndex, setDraggingIndex] = React.useState(null);
+  const [dragPos, setDragPos] = React.useState({ x: 0, y: 0 });
+  const [rotation, setRotation] = React.useState(0);
+
+  const imgRef = React.useRef(null);
+  const containerRef = React.useRef(null);
 
   const magnifierSize = 100;
   const zoom = 2;
 
-  // Initialize corners at image edges
-  const initCorners = () => {
+  // Initialize corners
+  const initCorners = React.useCallback(() => {
     if (!imgRef.current) return;
     const img = imgRef.current;
     setCorners([
-      { x: 0, y: 0 },                 // top-left
-      { x: img.width, y: 0 },         // top-right
-      { x: img.width, y: img.height },// bottom-right
-      { x: 0, y: img.height },        // bottom-left
+      { x: 0, y: 0 },                  // top-left
+      { x: img.width, y: 0 },          // top-right
+      { x: img.width, y: img.height }, // bottom-right
+      { x: 0, y: img.height },         // bottom-left
     ]);
-  };
+  }, []);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const img = imgRef.current;
     if (!img) return;
     if (img.complete) initCorners();
     else img.onload = initCorners;
-  }, [src]);
+  }, [src, initCorners]);
 
-  const startDrag = (index: number) => (e: MouseEvent | TouchEvent) => {
+  // Drag logic
+  const startDrag = (index) => (e) => {
     e.preventDefault();
     setDraggingIndex(index);
   };
 
-  const stopDrag = () => setDraggingIndex(null);
+  const stopDrag = React.useCallback(() => {
+    setDraggingIndex(null);
+  }, []);
 
-  const onDrag = (e: MouseEvent | TouchEvent) => {
-    if (draggingIndex === null || !containerRef.current || !imgRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const clientX = "clientX" in e ? e.clientX : e.touches?.[0]?.clientX;
-    const clientY = "clientY" in e ? e.clientY : e.touches?.[0]?.clientY;
-    if (clientX === undefined || clientY === undefined) return;
+  const onDrag = React.useCallback(
+    (e) => {
+      if (draggingIndex === null || !containerRef.current || !imgRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const clientX = e.clientX !== undefined ? e.clientX : e.touches?.[0]?.clientX;
+      const clientY = e.clientY !== undefined ? e.clientY : e.touches?.[0]?.clientY;
+      if (clientX === undefined || clientY === undefined) return;
 
-    // Clamp handle strictly inside image
-    const x = Math.min(Math.max(clientX - rect.left, 0), imgRef.current.width);
-    const y = Math.min(Math.max(clientY - rect.top, 0), imgRef.current.height);
+      // Clamp handle strictly inside image
+      const x = Math.min(Math.max(clientX - rect.left, 0), imgRef.current.width);
+      const y = Math.min(Math.max(clientY - rect.top, 0), imgRef.current.height);
 
-    setDragPos({ x, y });
+      setDragPos({ x, y });
 
-    setCorners((prev) =>
-      prev.map((c, i) => (i === draggingIndex ? { x, y } : c))
-    );
-  };
+      setCorners((prev) =>
+        prev.map((c, i) => (i === draggingIndex ? { x, y } : c))
+      );
+    },
+    [draggingIndex]
+  );
 
-  useEffect(() => {
+  React.useEffect(() => {
     window.addEventListener("mousemove", onDrag);
     window.addEventListener("mouseup", stopDrag);
     window.addEventListener("touchmove", onDrag);
@@ -68,8 +75,9 @@ function FreeformCropper({ src, onCropChange }) {
       window.removeEventListener("touchmove", onDrag);
       window.removeEventListener("touchend", stopDrag);
     };
-  }, [draggingIndex]);
+  }, [onDrag, stopDrag]);
 
+  // Crop function
   const handleCrop = () => {
     if (!imgRef.current) return;
     const canvas = document.createElement("canvas");
@@ -86,6 +94,7 @@ function FreeformCropper({ src, onCropChange }) {
     const minY = Math.min(...ys);
     const maxX = Math.max(...xs);
     const maxY = Math.max(...ys);
+
     const width = maxX - minX;
     const height = maxY - minY;
 
@@ -100,24 +109,25 @@ function FreeformCropper({ src, onCropChange }) {
     onCropChange(canvas.toDataURL("image/png"));
   };
 
-  // Magnifier background position with proper edge handling
-  const bgX = Math.max(
-    0,
-    Math.min(dragPos.x * zoom - magnifierSize / 2, imgRef.current?.width! * zoom - magnifierSize)
-  );
-  const bgY = Math.max(
-    0,
-    Math.min(dragPos.y * zoom - magnifierSize / 2, imgRef.current?.height! * zoom - magnifierSize)
-  );
+  // Magnifier positions
+  const imgWidth = imgRef.current ? imgRef.current.width : 0;
+  const imgHeight = imgRef.current ? imgRef.current.height : 0;
 
-  // Magnifier position relative to handle
+  const bgX = Math.max(0, Math.min(dragPos.x * zoom - magnifierSize / 2, imgWidth * zoom - magnifierSize));
+  const bgY = Math.max(0, Math.min(dragPos.y * zoom - magnifierSize / 2, imgHeight * zoom - magnifierSize));
+
   const magLeft =
-    dragPos.x < magnifierSize / 2 ? dragPos.x : dragPos.x > (imgRef.current?.width! - magnifierSize / 2)
-      ? dragPos.x - magnifierSize
+    dragPos.x < magnifierSize / 2
+      ? 0
+      : dragPos.x > imgWidth - magnifierSize / 2
+      ? imgWidth - magnifierSize
       : dragPos.x - magnifierSize / 2;
+
   const magTop =
-    dragPos.y < magnifierSize / 2 ? dragPos.y : dragPos.y > (imgRef.current?.height! - magnifierSize / 2)
-      ? dragPos.y - magnifierSize
+    dragPos.y < magnifierSize / 2
+      ? 0
+      : dragPos.y > imgHeight - magnifierSize / 2
+      ? imgHeight - magnifierSize
       : dragPos.y - magnifierSize / 2;
 
   return (
@@ -165,7 +175,7 @@ function FreeformCropper({ src, onCropChange }) {
               width: magnifierSize,
               height: magnifierSize,
               backgroundImage: `url(${src})`,
-              backgroundSize: `${imgRef.current.width * zoom}px ${imgRef.current.height * zoom}px`,
+              backgroundSize: `${imgWidth * zoom}px ${imgHeight * zoom}px`,
               backgroundPosition: `-${bgX}px -${bgY}px`,
               backgroundRepeat: "no-repeat",
               backgroundColor: "white",
@@ -201,6 +211,7 @@ function FreeformCropper({ src, onCropChange }) {
     </div>
   );
 }
+
 
 // Main Civil ID Page
 export default function CivilIdPage() {

@@ -16,12 +16,7 @@ interface CropperProps {
 
 export default function FreeformCropper({ src, onCropChange }: CropperProps) {
   // Initial corner points
-  const [corners, setCorners] = useState<Point[]>([
-    { x: 50, y: 50 },
-    { x: 250, y: 50 },
-    { x: 250, y: 250 },
-    { x: 50, y: 250 },
-  ]);
+  const [corners, setCorners] = useState<Point[]>([]);
 
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);

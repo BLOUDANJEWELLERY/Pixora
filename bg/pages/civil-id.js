@@ -12,7 +12,7 @@ export default function CivilIdPage() {
   const [error, setError] = useState<string | null>(null);
 
   :
-const handleFileChange = (e, type) => { ... }
+const handleFileChange = (e, type) => {
   const file = e.target.files?.[0];
     if (!file) return;
     if (type === "front") {

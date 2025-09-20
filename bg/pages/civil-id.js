@@ -41,11 +41,8 @@ const onDrag = (e) => {
   const clientY = e.clientY ?? e.touches?.[0]?.clientY;
 
   // Clamp handle CENTER, not edge
-  const handleSize = 16; // handle diameter
-const radius = handleSize / 2;
-
-const x = Math.min(Math.max(clientX - rect.left, radius), rect.width - radius);
-const y = Math.min(Math.max(clientY - rect.top, radius), rect.height - radius);
+  const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
+  const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
 
   setDragPos({ x, y });
 
@@ -130,20 +127,26 @@ const y = Math.min(Math.max(clientY - rect.top, radius), rect.height - radius);
         ))}
 
         {/* Magnifier Preview */}
+{/* Magnifier Preview */}
 {draggingIndex !== null && imgRef.current && (
   <div
     className="absolute border-2 border-blue-500 rounded-full overflow-hidden pointer-events-none bg-white"
     style={{
-      left: dragPos.x + 20,
-      top: dragPos.y - 100,
+      // Decide position dynamically
+      left:
+        dragPos.x < 60
+          ? dragPos.x + 20 // if too close to left, push right
+          : dragPos.x - 120, // default: show on left
+      top:
+        dragPos.y < 60
+          ? dragPos.y + 20 // if too close to top, push below
+          : dragPos.y - 120, // default: show above
       width: 100,
       height: 100,
       backgroundImage: `url(${src})`,
-      backgroundSize: `${imgRef.current.width * 2}px ${
-        imgRef.current.height * 2
-      }px`,
+      backgroundSize: `${imgRef.current.width * 2}px ${imgRef.current.height * 2}px`,
       backgroundPosition: `-${dragPos.x * 2 - 50}px -${dragPos.y * 2 - 50}px`,
-       backgroundRepeat: "no-repeat",
+      backgroundRepeat: "no-repeat",
       backgroundColor: "white",
     }}
   >

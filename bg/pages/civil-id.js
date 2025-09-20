@@ -126,25 +126,35 @@ function FreeformCropper({ src, onCropChange }) {
         ))}
 
         {/* Magnifier Preview */}
-        {draggingIndex !== null && (
-          <div
-            className="absolute border-2 border-blue-500 rounded-lg overflow-hidden pointer-events-none"
-            style={{
-              left: dragPos.x + 20,
-              top: dragPos.y - 80,
-              width: 80,
-              height: 80,
-              backgroundImage: `url(${src})`,
-              backgroundSize: `${imgRef.current?.width * 2}px ${
-                imgRef.current?.height * 2
-              }px`,
-              backgroundPosition: `-${dragPos.x * 2 - 40}px -${
-                dragPos.y * 2 - 40
-              }px`,
-            }}
-          />
-        )}
-      </div>
+   {/* Magnifier Preview */}
+{draggingIndex !== null && (
+  <div
+    className="absolute border-2 border-blue-500 rounded-full overflow-hidden pointer-events-none"
+    style={{
+      left: dragPos.x + 20,
+      top: dragPos.y - 100,
+      width: 100,
+      height: 100,
+      backgroundImage: `url(${src})`,
+      backgroundSize: `${imgRef.current?.width * 2}px ${
+        imgRef.current?.height * 2
+      }px`,
+      backgroundPosition: `-${dragPos.x * 2 - 50}px -${
+        dragPos.y * 2 - 50
+      }px`,
+    }}
+  >
+    {/* Corner marker (center point) */}
+    <div
+      className="absolute w-3 h-3 bg-red-500 rounded-full border border-white"
+      style={{
+        left: "50%",
+        top: "50%",
+        transform: "translate(-50%, -50%)",
+      }}
+    />
+  </div>
+)}
 
       {/* Rotation Slider */}
       <div className="flex justify-center mt-4">

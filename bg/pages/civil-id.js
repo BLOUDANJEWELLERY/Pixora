@@ -3,41 +3,32 @@
 import jsPDF from "jspdf";
 import React, { useState, useRef, useEffect } from "react";
 
-// Point type
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface CropperProps {
-  src: string;
-  onCropChange: (croppedDataUrl: string) => void;
-}
-
-export default function FreeformCropper({ src, onCropChange }: CropperProps) {
+export default function FreeformCropper({ src, onCropChange }) {
   // Initial corner points
-  const [corners, setCorners] = useState<Point[]>([]);
+  const [corners, setCorners] = useState([
+    { x: 50, y: 50 },
+    { x: 250, y: 50 },
+    { x: 250, y: 250 },
+    { x: 50, y: 250 },
+  ]);
 
-  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [draggingIndex, setDraggingIndex] = useState(null);
+  const imgRef = useRef(null);
+  const containerRef = useRef(null);
 
-  // Start dragging a corner
-  const startDrag = (index: number) => (e: React.MouseEvent | React.TouchEvent) => {
+  const startDrag = (index) => (e) => {
     e.preventDefault();
     setDraggingIndex(index);
   };
 
-  // Stop dragging
   const stopDrag = () => setDraggingIndex(null);
 
-  // Dragging logic
-  const onDrag = (e: MouseEvent | TouchEvent) => {
+  const onDrag = (e) => {
     if (draggingIndex === null || !containerRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
-    const clientX = "clientX" in e ? e.clientX : e.touches[0].clientX;
-    const clientY = "clientY" in e ? e.clientY : e.touches[0].clientY;
+    const clientX = e.clientX !== undefined ? e.clientX : e.touches[0].clientX;
+    const clientY = e.clientY !== undefined ? e.clientY : e.touches[0].clientY;
 
     const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
     const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
@@ -52,6 +43,7 @@ export default function FreeformCropper({ src, onCropChange }: CropperProps) {
     window.addEventListener("mouseup", stopDrag);
     window.addEventListener("touchmove", onDrag);
     window.addEventListener("touchend", stopDrag);
+
     return () => {
       window.removeEventListener("mousemove", onDrag);
       window.removeEventListener("mouseup", stopDrag);
@@ -60,7 +52,6 @@ export default function FreeformCropper({ src, onCropChange }: CropperProps) {
     };
   }, [draggingIndex]);
 
-  // Crop image based on corners
   const handleCrop = () => {
     if (!imgRef.current) return;
 

@@ -201,13 +201,13 @@ function FreeformCropper({ src, onCropChange }) {
         <img
           src={src}
           ref={imgRef}
-          className="block w-full rounded-xl border border-blue-300"
+          className="block w-full rounded-xl border border-blue-300 select-none"
           style={{ transform: `rotate(${rotation}deg)` }}
           alt="To crop"
         />
 
         {/* Polygon overlay - Made transparent */}
-        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
+        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none select-none">
           <polygon
             points={corners.map((p) => `${p.x},${p.y}`).join(" ")}
             fill="none"
@@ -222,7 +222,7 @@ function FreeformCropper({ src, onCropChange }) {
             key={idx}
             onMouseDown={startDrag(idx)}
             onTouchStart={startDrag(idx)}
-            className="absolute w-4 h-4 bg-blue-600 rounded-full cursor-grab"
+            className="absolute w-4 h-4 bg-blue-600 rounded-full cursor-grab select-none"
             style={{ left: corner.x - 8, top: corner.y - 8 }}
           />
         ))}
@@ -230,7 +230,7 @@ function FreeformCropper({ src, onCropChange }) {
         {/* Magnifier */}
         {draggingIndex !== null && imgRef.current && (
           <div
-            className="absolute border-2 border-blue-500 rounded-full overflow-hidden pointer-events-none bg-white"
+            className="absolute border-2 border-blue-500 rounded-full overflow-hidden pointer-events-none bg-white select-none"
             style={{
               left: magLeft,
               top: magTop,
@@ -250,7 +250,7 @@ function FreeformCropper({ src, onCropChange }) {
       </div>
 
       {/* Rotation Slider */}
-      <div className="flex justify-center mt-4">
+      <div className="flex justify-center mt-4 select-none">
         <input
           type="range"
           min={-180}
@@ -263,7 +263,7 @@ function FreeformCropper({ src, onCropChange }) {
 
       <button
         onClick={handleCrop}
-        className="mt-2 bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-2 px-4 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
+        className="mt-2 bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-2 px-4 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 select-none"
       >
         Crop
       </button>
@@ -546,7 +546,7 @@ useEffect(() => {
 
 {editingImage && (
   <div 
-    className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6"
+    className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6 select-none"
     style={{ 
       position: 'fixed', 
       top: 0, 
@@ -566,7 +566,7 @@ useEffect(() => {
     }}
   >
     <div 
-      className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto modal-content"
+      className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto modal-content select-none"
       onClick={(e) => e.stopPropagation()}
     >
       <h2 className="text-xl font-semibold text-blue-900 mb-4">Edit Image</h2>
@@ -576,7 +576,7 @@ useEffect(() => {
       />
       <button
         onClick={closeCropper}
-        className="mt-4 bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
+        className="mt-4 bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 select-none"
       >
         Done
       </button>

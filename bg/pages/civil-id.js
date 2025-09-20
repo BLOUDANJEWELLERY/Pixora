@@ -155,6 +155,7 @@ function FreeformCropper({ src, onCropChange }) {
     />
   </div>
 )}
+</div>
 
       {/* Rotation Slider */}
       <div className="flex justify-center mt-4">

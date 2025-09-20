@@ -12,7 +12,6 @@ function FreeformCropper({ src, onCropChange }) {
   const imgRef = React.useRef(null);
   const containerRef = React.useRef(null);
   const magnifierCanvasRef = React.useRef(null);
-  const sliderRef = React.useRef(null);
 
   const magnifierSize = 100;
   const zoom = 2;
@@ -113,11 +112,6 @@ function FreeformCropper({ src, onCropChange }) {
   const onDrag = React.useCallback(
     (e) => {
       if (draggingIndex === null || !containerRef.current || !imgRef.current) return;
-      
-      // Check if the event target is the slider
-      if (e.target === sliderRef.current || sliderRef.current?.contains(e.target)) {
-        return; // Don't handle drag events for the slider
-      }
       
       const rect = containerRef.current.getBoundingClientRect();
       const clientX = e.clientX !== undefined ? e.clientX : e.touches?.[0]?.clientX;
@@ -258,15 +252,12 @@ function FreeformCropper({ src, onCropChange }) {
       {/* Rotation Slider */}
       <div className="flex justify-center mt-4">
         <input
-          ref={sliderRef}
           type="range"
           min={-180}
           max={180}
           value={rotation}
           onChange={(e) => setRotation(Number(e.target.value))}
           className="w-1/2"
-          onTouchStart={(e) => e.stopPropagation()} // Allow slider to handle its own touch events
-          onTouchMove={(e) => e.stopPropagation()} // Allow slider to handle its own touch events
         />
       </div>
 
@@ -279,7 +270,6 @@ function FreeformCropper({ src, onCropChange }) {
     </div>
   );
 }
-
 
 // Main Civil ID Page
 export default function CivilIdPage() {
@@ -411,7 +401,7 @@ const handleCropChange = (dataUrl, type) => {
   };
 
  
-  useEffect(() => {
+  {/*useEffect(() => {
     if (editingImage) {
       // Store the current scroll position
       const scrollY = window.scrollY;
@@ -441,8 +431,39 @@ const handleCropChange = (dataUrl, type) => {
         document.removeEventListener('touchmove', preventDefault);
       };
     }
-  }, [editingImage]);
+  }, [editingImage]);*/}
 
+useEffect(() => {
+  if (editingImage) {
+    // Store the current scroll position
+    const scrollY = window.scrollY;
+    
+    // Prevent scrolling
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    document.body.style.overflow = 'hidden';
+  } else {
+    // Re-enable scrolling and restore scroll position
+    const scrollY = document.body.style.top;
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    document.body.style.overflow = '';
+    
+    if (scrollY) {
+      window.scrollTo(0, parseInt(scrollY || '0') * -1);
+    }
+  }
+  
+  // Cleanup function
+  return () => {
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    document.body.style.overflow = '';
+  };
+}, [editingImage]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
@@ -536,13 +557,16 @@ const handleCropChange = (dataUrl, type) => {
     }}
     onTouchMove={(e) => {
       // Only prevent default if the touch is on the modal background, not the cropper
-      if (e.target === e.currentTarget) {
+      const isBackground = e.target === e.currentTarget;
+      const isModalContent = e.target.closest('.modal-content');
+      
+      if (isBackground || isModalContent) {
         e.preventDefault();
       }
     }}
   >
     <div 
-      className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+      className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto modal-content"
       onClick={(e) => e.stopPropagation()}
     >
       <h2 className="text-xl font-semibold text-blue-900 mb-4">Edit Image</h2>

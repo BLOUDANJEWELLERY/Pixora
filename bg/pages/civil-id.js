@@ -502,24 +502,28 @@ useEffect(() => {
   </div>
 )}
 
-
 {editingImage && (
-  <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6 overflow-hidden">
-    <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-      <h2 className="text-xl font-semibold text-blue-900 mb-4">Edit Image</h2>
-      <FreeformCropper
-        src={editingImage === "front" ? frontPreview : backPreview}
-        onCropChange={(dataUrl) => handleCropChange(dataUrl, editingImage)}
-      />
-      <button
-        onClick={closeCropper}
-        className="mt-4 bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
-      >
-        Done
-      </button>
+  <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 overflow-hidden">
+    <div className="bg-white p-6 rounded-2xl shadow-2xl w-full h-full max-h-full overflow-y-auto">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold text-blue-900">Edit Image</h2>
+        <button
+          onClick={closeCropper}
+          className="text-gray-500 hover:text-gray-700 text-2xl"
+        >
+          ×
+        </button>
+      </div>
+      <div className="h-[calc(100%-80px)]">
+        <FreeformCropper
+          src={editingImage === "front" ? frontPreview : backPreview}
+          onCropChange={(dataUrl) => handleCropChange(dataUrl, editingImage)}
+        />
+      </div>
     </div>
   </div>
 )}
+
 
     </div>
   );

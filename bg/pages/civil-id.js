@@ -109,39 +109,49 @@ function FreeformCropper({ src, onCropChange }) {
 
   const stopDrag = React.useCallback(() => setDraggingIndex(null), []);
 
-  const onDrag = React.useCallback(
-    (e) => {
-      if (draggingIndex === null || !containerRef.current || !imgRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const clientX = e.clientX !== undefined ? e.clientX : e.touches?.[0]?.clientX;
-      const clientY = e.clientY !== undefined ? e.clientY : e.touches?.[0]?.clientY;
-      if (clientX === undefined || clientY === undefined) return;
+ const onDrag = React.useCallback(
+  (e) => {
+    if (draggingIndex === null || !containerRef.current || !imgRef.current) return;
+    
+    // Prevent default for touch events
+    if (e.type === 'touchmove') {
+      e.preventDefault();
+    }
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const clientX = e.clientX !== undefined ? e.clientX : e.touches?.[0]?.clientX;
+    const clientY = e.clientY !== undefined ? e.clientY : e.touches?.[0]?.clientY;
+    if (clientX === undefined || clientY === undefined) return;
 
-      // Clamp handle strictly inside image
-      const x = Math.min(Math.max(clientX - rect.left, 0), imgRef.current.width);
-      const y = Math.min(Math.max(clientY - rect.top, 0), imgRef.current.height);
+    // Clamp handle strictly inside image
+    const x = Math.min(Math.max(clientX - rect.left, 0), imgRef.current.width);
+    const y = Math.min(Math.max(clientY - rect.top, 0), imgRef.current.height);
 
-      setDragPos({ x, y });
+    setDragPos({ x, y });
 
-      setCorners((prev) =>
-        prev.map((c, i) => (i === draggingIndex ? { x, y } : c))
-      );
-    },
-    [draggingIndex]
-  );
+    setCorners((prev) =>
+      prev.map((c, i) => (i === draggingIndex ? { x, y } : c))
+    );
+  },
+  [draggingIndex]
+);
 
-  React.useEffect(() => {
-    window.addEventListener("mousemove", onDrag);
-    window.addEventListener("mouseup", stopDrag);
-    window.addEventListener("touchmove", onDrag);
-    window.addEventListener("touchend", stopDrag);
-    return () => {
-      window.removeEventListener("mousemove", onDrag);
-      window.removeEventListener("mouseup", stopDrag);
-      window.removeEventListener("touchmove", onDrag);
-      window.removeEventListener("touchend", stopDrag);
-    };
-  }, [onDrag, stopDrag]);
+// Also update the event listeners to use passive: false for touch events
+React.useEffect(() => {
+  const options = { passive: false };
+  
+  window.addEventListener("mousemove", onDrag);
+  window.addEventListener("mouseup", stopDrag);
+  window.addEventListener("touchmove", onDrag, options);
+  window.addEventListener("touchend", stopDrag);
+  
+  return () => {
+    window.removeEventListener("mousemove", onDrag);
+    window.removeEventListener("mouseup", stopDrag);
+    window.removeEventListener("touchmove", onDrag);
+    window.removeEventListener("touchend", stopDrag);
+  };
+}, [onDrag, stopDrag]);
 
   const handleCrop = () => {
     if (!imgRef.current) return;
@@ -398,7 +408,7 @@ const handleCropChange = (dataUrl, type) => {
     };
   };
 
-  // Effect to prevent scrolling when modal is open
+ 
   useEffect(() => {
     if (editingImage) {
       // Store the current scroll position
@@ -409,26 +419,26 @@ const handleCropChange = (dataUrl, type) => {
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
       document.body.style.overflow = 'hidden';
-    } else {
-      // Re-enable scrolling and restore scroll position
-      const scrollY = document.body.style.top;
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.body.style.overflow = '';
       
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
-      }
+      // Add touch event prevention
+      const preventDefault = (e) => e.preventDefault();
+      document.addEventListener('touchmove', preventDefault, { passive: false });
+      
+      return () => {
+        // Re-enable scrolling and restore scroll position
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        document.body.style.overflow = '';
+        
+        if (scrollY) {
+          window.scrollTo(0, parseInt(scrollY || '0') * -1);
+        }
+        
+        // Remove touch event prevention
+        document.removeEventListener('touchmove', preventDefault);
+      };
     }
-    
-    // Cleanup function
-    return () => {
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.body.style.overflow = '';
-    };
   }, [editingImage]);
 
 
@@ -511,7 +521,7 @@ const handleCropChange = (dataUrl, type) => {
   </div>
 )}
 
-    {/* Modal */}
+       {/* Modal with touch event prevention */}
       {editingImage && (
         <div 
           className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6"
@@ -521,12 +531,15 @@ const handleCropChange = (dataUrl, type) => {
             left: 0, 
             right: 0, 
             bottom: 0,
-            overflow: 'hidden'
+            overflow: 'hidden',
+            touchAction: 'none' // Disable touch actions
           }}
+          onTouchMove={(e) => e.preventDefault()} // Prevent touch move events
         >
           <div 
             className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()} // Stop touch events from propagating
           >
             <h2 className="text-xl font-semibold text-blue-900 mb-4">Edit Image</h2>
             <FreeformCropper

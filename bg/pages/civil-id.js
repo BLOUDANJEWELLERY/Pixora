@@ -105,21 +105,25 @@ function FreeformCropper({ src, onCropChange }) {
     onCropChange(canvas.toDataURL("image/png"));
   };
 
-  // Magnifier background and position (allow blank space)
+  // Get image dimensions
   const imgWidth = imgRef.current ? imgRef.current.width : 0;
   const imgHeight = imgRef.current ? imgRef.current.height : 0;
 
-  // Calculate bg position so that magnifier shows blank areas if outside image
+  // Calculate magnifier position (clamped to image boundaries)
+  const magLeft = Math.max(0, Math.min(dragPos.x - magnifierSize / 2, imgWidth - magnifierSize));
+  const magTop = Math.max(0, Math.min(dragPos.y - magnifierSize / 2, imgHeight - magnifierSize));
+
+  // Calculate background position (allow blank space when near edges)
   let bgX = dragPos.x * zoom - magnifierSize / 2;
   let bgY = dragPos.y * zoom - magnifierSize / 2;
 
-  // Magnifier position relative to handle
-  const magLeft = dragPos.x - magnifierSize / 2;
-  const magTop = dragPos.y - magnifierSize / 2;
+  // Adjust background position to prevent sticking at edges
+  bgX = Math.max(0, Math.min(bgX, imgWidth * zoom - magnifierSize));
+  bgY = Math.max(0, Math.min(bgY, imgHeight * zoom - magnifierSize));
 
   return (
     <div ref={containerRef} className="relative inline-block w-full">
-      <div className="relative">
+      <div className="relative" style={{ overflow: 'visible' }}>
         <img
           src={src}
           ref={imgRef}
@@ -163,6 +167,7 @@ function FreeformCropper({ src, onCropChange }) {
               backgroundPosition: `-${bgX}px -${bgY}px`,
               backgroundRepeat: "no-repeat",
               backgroundColor: "white",
+              zIndex: 1000, // Ensure magnifier is on top
             }}
           >
             {/* Crosshair */}
@@ -195,7 +200,6 @@ function FreeformCropper({ src, onCropChange }) {
     </div>
   );
 }
-
 
 // Main Civil ID Page
 export default function CivilIdPage() {

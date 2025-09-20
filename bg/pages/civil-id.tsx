@@ -1,18 +1,20 @@
+Now i need to enhance this civil id pdf generator page firstly the image upload fields are going out of their container box towards fix them in and when creating pdf the civil id images should have a rounder borders so it feels more beautiful while keeping live preview and watermark and everything else intact:
+// pages/civil-id.js:
 "use client";
 import { useState } from "react";
 import jsPDF from "jspdf";
 
 export default function CivilIdPage() {
-  const [frontFile, setFrontFile] = useState<File | null>(null);
-  const [backFile, setBackFile] = useState<File | null>(null);
-  const [frontPreview, setFrontPreview] = useState<string | null>(null);
-  const [backPreview, setBackPreview] = useState<string | null>(null);
+  const [frontFile, setFrontFile] = useState(null);
+  const [backFile, setBackFile] = useState(null);
+  const [frontPreview, setFrontPreview] = useState(null);
+  const [backPreview, setBackPreview] = useState(null);
   const [watermark, setWatermark] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: "front" | "back") => {
-    const file = e.target.files?.[0];
+  const handleFileChange = (e, type) => {
+    const file = e.target.files[0];
     if (!file) return;
     if (type === "front") {
       setFrontFile(file);
@@ -45,6 +47,8 @@ export default function CivilIdPage() {
       if (!res.ok) throw new Error("Server error");
 
       const data = await res.json();
+
+      // Decode base64 directly into image URLs
       setFrontPreview(`data:image/jpeg;base64,${data.front}`);
       setBackPreview(`data:image/jpeg;base64,${data.back}`);
     } catch (e) {
@@ -54,68 +58,67 @@ export default function CivilIdPage() {
     setLoading(false);
   };
 
-  const downloadPDF = () => {
-    if (!frontPreview || !backPreview) return;
+const downloadPDF = () => {
+  if (!frontPreview || !backPreview) return;
 
-    const pdf = new jsPDF("p", "pt", "a4");
-    const a4Width = 595;
-    const a4Height = 842;
-    const margin = 20;
-    const radius = 20; // rounded corners
+  const pdf = new jsPDF("p", "pt", "a4");
+  const a4Width = 595;   // pt
+  const a4Height = 842;  // pt
+  const margin = 20;
 
-    const frontImg = new Image();
-    const backImg = new Image();
-    frontImg.src = frontPreview;
-    backImg.src = backPreview;
+  const frontImg = new Image();
+  const backImg = new Image();
+  frontImg.src = frontPreview;
+  backImg.src = backPreview;
 
-    frontImg.onload = () => {
-      backImg.onload = () => {
-        const availableHeight = a4Height - margin * 2;
-        const spacing = availableHeight * 0.1;
-        const maxImgHeight = (availableHeight - spacing) / 2 * 0.7;
+  frontImg.onload = () => {
+    backImg.onload = () => {
+      // Calculate available height for both images with spacing
+      const availableHeight = a4Height - margin * 2;
+      const spacing = availableHeight * 0.1; // space between front and back
+      const maxImgHeight = (availableHeight - spacing) / 2 * 0.7; // reduce by 30%
+      
+      // Front image size
+      let frontRatio = frontImg.width / frontImg.height;
+      let frontHeight = maxImgHeight;
+      let frontWidth = frontHeight * frontRatio;
+      if (frontWidth > a4Width - margin * 2) {
+        frontWidth = a4Width - margin * 2;
+        frontHeight = frontWidth / frontRatio;
+      }
+      const frontX = (a4Width - frontWidth) / 2;
+      const frontY = margin + (availableHeight / 2 - frontHeight - spacing/2) / 2;
 
-        const calcSize = (img: HTMLImageElement) => {
-          const ratio = img.width / img.height;
-          let height = maxImgHeight;
-          let width = height * ratio;
-          if (width > a4Width - margin * 2) {
-            width = a4Width - margin * 2;
-            height = width / ratio;
-          }
-          return { width, height };
-        };
+      // Back image size
+      let backRatio = backImg.width / backImg.height;
+      let backHeight = maxImgHeight;
+      let backWidth = backHeight * backRatio;
+      if (backWidth > a4Width - margin * 2) {
+        backWidth = a4Width - margin * 2;
+        backHeight = backWidth / backRatio;
+      }
+      const backX = (a4Width - backWidth) / 2;
+      const backY = frontY + frontHeight + spacing;
 
-        const frontSize = calcSize(frontImg);
-        const backSize = calcSize(backImg);
+      // White background
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, a4Width, a4Height, "F");
 
-        const frontX = (a4Width - frontSize.width) / 2;
-        const frontY = margin + (availableHeight / 2 - frontSize.height - spacing / 2) / 2;
-        const backX = (a4Width - backSize.width) / 2;
-        const backY = frontY + frontSize.height + spacing;
+      // Add images
+      pdf.addImage(frontImg, "JPEG", frontX, frontY, frontWidth, frontHeight);
+      pdf.addImage(backImg, "JPEG", backX, backY, backWidth, backHeight);
 
-        pdf.setFillColor(255, 255, 255);
-        pdf.rect(0, 0, a4Width, a4Height, "F");
+      // Watermark if any
+      if (watermark) {
+        pdf.setTextColor(180, 180, 180);
+        pdf.setFontSize(50);
+        pdf.text(watermark, a4Width / 2, a4Height / 2, { align: "center", angle: -45 });
+      }
 
-        // Draw images with rounded corners
-        const drawRoundedImage = (img: HTMLImageElement, x: number, y: number, w: number, h: number) => {
-          pdf.roundedRect(x, y, w, h, radius, radius, "S");
-          pdf.addImage(img, "JPEG", x, y, w, h, undefined, "FAST");
-        };
-
-        drawRoundedImage(frontImg, frontX, frontY, frontSize.width, frontSize.height);
-        drawRoundedImage(backImg, backX, backY, backSize.width, backSize.height);
-
-        // Watermark
-        if (watermark) {
-          pdf.setTextColor(180, 180, 180);
-          pdf.setFontSize(50);
-          pdf.text(watermark, a4Width / 2, a4Height / 2, { align: "center", angle: -45 });
-        }
-
-        pdf.save("civil-id.pdf");
-      };
+      pdf.save("civil-id.pdf");
     };
   };
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
@@ -128,7 +131,7 @@ export default function CivilIdPage() {
             type="file"
             accept="image/*"
             onChange={(e) => handleFileChange(e, "front")}
-            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full max-w-full"
+            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70"
           />
         </div>
         <div>
@@ -137,7 +140,7 @@ export default function CivilIdPage() {
             type="file"
             accept="image/*"
             onChange={(e) => handleFileChange(e, "back")}
-            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full max-w-full"
+            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70"
           />
         </div>
         <div>
@@ -147,7 +150,7 @@ export default function CivilIdPage() {
             placeholder="Enter watermark text"
             value={watermark}
             onChange={(e) => setWatermark(e.target.value)}
-            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full max-w-full"
+            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full"
           />
         </div>
         <button
@@ -163,8 +166,8 @@ export default function CivilIdPage() {
       {(frontPreview || backPreview) && (
         <div className="mt-8 flex flex-col items-center gap-4 w-full max-w-xl">
           <h2 className="text-2xl font-semibold text-blue-900">Preview:</h2>
-          {frontPreview && <img src={frontPreview} alt="Front" className="border border-blue-300 shadow-md rounded-2xl max-w-full" />}
-          {backPreview && <img src={backPreview} alt="Back" className="border border-blue-300 shadow-md rounded-2xl max-w-full" />}
+          {frontPreview && <img src={frontPreview} alt="Front" className="border border-blue-300 shadow-md rounded-xl" />}
+          {backPreview && <img src={backPreview} alt="Back" className="border border-blue-300 shadow-md rounded-xl" />}
           <button
             onClick={downloadPDF}
             className="bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"

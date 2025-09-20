@@ -279,6 +279,7 @@ const downloadPDF = () => {
   {error && <p className="text-red-600 font-semibold">{error}</p>}
 </div>
 
+
   {(frontPreview || backPreview) && (
         <div className="mt-8 flex flex-col items-center gap-6 w-full max-w-xl">
           {frontPreview && (
@@ -301,3 +302,7 @@ const downloadPDF = () => {
           </button>
         </div>
       )}
+      
+      </div>
+      );
+      }

@@ -49,28 +49,38 @@ function FreeformCropper({ src, onCropChange }) {
     };
   }, [draggingIndex]);
 
-  const handleCrop = () => {
-    if (!imgRef.current) return;
+const handleCrop = () => {
+  if (!imgRef.current) return;
 
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
 
-    const xs = corners.map((p) => p.x);
-    const ys = corners.map((p) => p.y);
-    const minX = Math.min(...xs);
-    const minY = Math.min(...ys);
-    const maxX = Math.max(...xs);
-    const maxY = Math.max(...ys);
-    const width = maxX - minX;
-    const height = maxY - minY;
+  const img = imgRef.current;
 
-    canvas.width = width;
-    canvas.height = height;
+  // Scale factor: image natural size vs displayed size
+  const scaleX = img.naturalWidth / img.width;
+  const scaleY = img.naturalHeight / img.height;
 
-    ctx.drawImage(imgRef.current, minX, minY, width, height, 0, 0, width, height);
-    onCropChange(canvas.toDataURL("image/png"));
-  };
+  // Convert corner coordinates to natural image coordinates
+  const xs = corners.map((p) => p.x * scaleX);
+  const ys = corners.map((p) => p.y * scaleY);
+
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const maxX = Math.max(...xs);
+  const maxY = Math.max(...ys);
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+
+  canvas.width = width;
+  canvas.height = height;
+
+  ctx.drawImage(img, minX, minY, width, height, 0, 0, width, height);
+
+  onCropChange(canvas.toDataURL("image/png"));
+};
 
   return (
     <div ref={containerRef} className="relative inline-block w-full">

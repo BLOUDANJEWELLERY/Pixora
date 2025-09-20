@@ -265,6 +265,8 @@ function FreeformCropper({ src, onCropChange }) {
           value={rotation}
           onChange={(e) => setRotation(Number(e.target.value))}
           className="w-1/2"
+          onTouchStart={(e) => e.stopPropagation()} // Allow slider to handle its own touch events
+          onTouchMove={(e) => e.stopPropagation()} // Allow slider to handle its own touch events
         />
       </div>
 

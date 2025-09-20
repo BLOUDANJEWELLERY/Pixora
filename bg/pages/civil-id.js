@@ -309,7 +309,6 @@ const handleCropChange = (dataUrl, type) => {
         {error && <p className="text-red-600 font-semibold">{error}</p>}
       </div>
 
-// JSX part for image previews
 {frontPreview && (
   <div className="relative">
     <img

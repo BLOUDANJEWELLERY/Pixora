@@ -19,7 +19,6 @@ export default function Home() {
         {/* Background Remover */}
         <Link href="/background-remover" className="transform hover:scale-105 transition-all">
           <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 flex flex-col items-center gap-4 border border-blue-200 border-opacity-30 hover:shadow-[0_0_30px_rgba(59,130,246,0.4)]">
-            <img src="/icons/remove-bg.png" alt="Background Remover" className="w-20 h-20 mb-4" />
             <h2 className="text-2xl font-semibold text-blue-900">Background Remover</h2>
             <p className="text-blue-900 text-center text-sm">
               Instantly remove image backgrounds and download them with transparency.
@@ -30,7 +29,6 @@ export default function Home() {
         {/* Background Extender */}
         <Link href="/back-extend" className="transform hover:scale-105 transition-all">
           <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 flex flex-col items-center gap-4 border border-blue-200 border-opacity-30 hover:shadow-[0_0_30px_rgba(59,130,246,0.4)]">
-            <img src="/icons/extend-bg.png" alt="Background Extender" className="w-20 h-20 mb-4" />
             <h2 className="text-2xl font-semibold text-blue-900">Background Extender</h2>
             <p className="text-blue-900 text-center text-sm">
               Extend image edges seamlessly and preview edge strips live.
@@ -41,7 +39,6 @@ export default function Home() {
         {/* Civil ID PDF Maker */}
         <Link href="/civil-id" className="transform hover:scale-105 transition-all">
           <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 flex flex-col items-center gap-4 border border-blue-200 border-opacity-30 hover:shadow-[0_0_30px_rgba(59,130,246,0.4)]">
-            <img src="/icons/civil-id.png" alt="Civil ID PDF Maker" className="w-20 h-20 mb-4" />
             <h2 className="text-2xl font-semibold text-blue-900">Civil ID PDF Maker</h2>
             <p className="text-blue-900 text-center text-sm">
               Generate Civil ID PDFs from your images quickly and securely.

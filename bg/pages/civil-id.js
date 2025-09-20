@@ -119,6 +119,24 @@ const handleCrop = () => {
 
 // Main Civil ID Page
 export default function CivilIdPage() {
+  // Inside CivilIdPage component
+const [editingImage, setEditingImage] = useState(null); // "front" | "back" | null
+
+const openCropper = (type) => {
+  setEditingImage(type);
+  document.body.style.overflow = "hidden"; // stop page scroll
+};
+
+const closeCropper = () => {
+  setEditingImage(null);
+  document.body.style.overflow = "auto"; // restore scroll
+};
+
+const handleCropChange = (croppedDataUrl, type) => {
+  if (type === "front") setFrontPreview(croppedDataUrl);
+  else if (type === "back") setBackPreview(croppedDataUrl);
+};
+  
   const [frontFile, setFrontFile] = useState(null);
   const [backFile, setBackFile] = useState(null);
   const [frontPreview, setFrontPreview] = useState(null);
@@ -275,28 +293,48 @@ export default function CivilIdPage() {
         {error && <p className="text-red-600 font-semibold">{error}</p>}
       </div>
 
-      {(frontPreview || backPreview) && (
-        <div className="mt-8 flex flex-col items-center gap-6 w-full max-w-xl">
-          {frontPreview && (
-            <div>
-              <h2 className="text-2xl font-semibold text-blue-900 mb-2">Front Side:</h2>
-              <FreeformCropper src={frontPreview} onCropChange={setFrontPreview} />
-            </div>
-          )}
-          {backPreview && (
-            <div>
-              <h2 className="text-2xl font-semibold text-blue-900 mb-2">Back Side:</h2>
-              <FreeformCropper src={backPreview} onCropChange={setBackPreview} />
-            </div>
-          )}
-          <button
-            onClick={downloadPDF}
-            className="bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
-          >
-            Download PDF
-          </button>
-        </div>
-      )}
+{frontPreview && (
+  <div className="relative">
+    <img src={frontPreview} alt="Front" className="border border-blue-300 shadow-md rounded-xl" />
+    <button
+      onClick={() => openCropper("front")}
+      className="absolute top-2 right-2 bg-blue-600 text-white px-3 py-1 rounded shadow hover:bg-blue-700"
+    >
+      Edit
+    </button>
+  </div>
+)}
+
+{backPreview && (
+  <div className="relative">
+    <img src={backPreview} alt="Back" className="border border-blue-300 shadow-md rounded-xl" />
+    <button
+      onClick={() => openCropper("back")}
+      className="absolute top-2 right-2 bg-blue-600 text-white px-3 py-1 rounded shadow hover:bg-blue-700"
+    >
+      Edit
+    </button>
+  </div>
+)}
+
+{editingImage && (
+  <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6">
+    <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full">
+      <h2 className="text-xl font-semibold text-blue-900 mb-4">Edit Image</h2>
+      <FreeformCropper
+        src={editingImage === "front" ? frontPreview : backPreview}
+        onCropChange={(dataUrl) => handleCropChange(dataUrl, editingImage)}
+      />
+      <button
+        onClick={closeCropper}
+        className="mt-4 bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
+      >
+        Done
+      </button>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }

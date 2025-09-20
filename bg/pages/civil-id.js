@@ -123,44 +123,48 @@ const downloadPDF = () => {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
       <h1 className="text-4xl font-bold text-blue-900 mb-8">Civil ID Processor</h1>
 
-      <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30">
-        <div>
-          <label className="font-semibold text-blue-900">Upload Front Side:</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => handleFileChange(e, "front")}
-            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70"
-          />
-        </div>
-        <div>
-          <label className="font-semibold text-blue-900">Upload Back Side:</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => handleFileChange(e, "back")}
-            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70"
-          />
-        </div>
-        <div>
-          <label className="font-semibold text-blue-900">Optional Watermark:</label>
-          <input
-            type="text"
-            placeholder="Enter watermark text"
-            value={watermark}
-            onChange={(e) => setWatermark(e.target.value)}
-            className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full"
-          />
-        </div>
-        <button
-          onClick={processCivilID}
-          disabled={loading}
-          className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300"
-        >
-          {loading ? "Processing Civil ID..." : "Process Civil ID"}
-        </button>
-        {error && <p className="text-red-600 font-semibold">{error}</p>}
-      </div>
+    <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30">
+  <div>
+    <label className="font-semibold text-blue-900">Upload Front Side:</label>
+    <input
+      type="file"
+      accept="image/*"
+      onChange={(e) => handleFileChange(e, "front")}
+      className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full"
+    />
+  </div>
+
+  <div>
+    <label className="font-semibold text-blue-900">Upload Back Side:</label>
+    <input
+      type="file"
+      accept="image/*"
+      onChange={(e) => handleFileChange(e, "back")}
+      className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full"
+    />
+  </div>
+
+  <div>
+    <label className="font-semibold text-blue-900">Optional Watermark:</label>
+    <input
+      type="text"
+      placeholder="Enter watermark text"
+      value={watermark}
+      onChange={(e) => setWatermark(e.target.value)}
+      className="block mt-2 p-2 border rounded-lg border-blue-300 bg-white/70 w-full"
+    />
+  </div>
+
+  <button
+    onClick={processCivilID}
+    disabled={loading}
+    className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 w-full"
+  >
+    {loading ? "Processing Civil ID..." : "Process Civil ID"}
+  </button>
+
+  {error && <p className="text-red-600 font-semibold">{error}</p>}
+</div>
 
       {(frontPreview || backPreview) && (
         <div className="mt-8 flex flex-col items-center gap-4 w-full max-w-xl">

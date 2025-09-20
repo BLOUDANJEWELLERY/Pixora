@@ -75,9 +75,9 @@ export default function CivilIdPage() {
         const maxImgHeight = (availableHeight - spacing) / 2 * 0.7;
 
         const calcSize = (img: HTMLImageElement) => {
-          let ratio = img.width / img.height;
-          let height = maxImgHeight;
-          let width = height * ratio;
+          const ratio = img.width / img.height;
+          const height = maxImgHeight;
+          const width = height * ratio;
           if (width > a4Width - margin * 2) {
             width = a4Width - margin * 2;
             height = width / ratio;

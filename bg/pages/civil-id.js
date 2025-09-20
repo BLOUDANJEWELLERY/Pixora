@@ -3,9 +3,16 @@
 import { useState } from "react";
 import jsPDF from "jspdf";
 
-// Reusable Freeform Cropper Component
-interface Point { x: number; y: number; }
-interface CropperProps { src: string; onCropChange: (croppedDataUrl: string) => void; }
+// Define Point type here
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface CropperProps {
+  src: string;
+  onCropChange: (croppedDataUrl: string) => void;
+}
 
 function FreeformCropper({ src, onCropChange }: CropperProps) {
   const [corners, setCorners] = useState<Point[]>([

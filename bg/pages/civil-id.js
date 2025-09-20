@@ -110,12 +110,13 @@ function FreeformCropper({ src, onCropChange }) {
   const imgHeight = imgRef.current ? imgRef.current.height : 0;
 
   // Calculate bg position so that magnifier shows blank areas if outside image
-  let bgX = dragPos.x * zoom - magnifierSize / 2;
-  let bgY = dragPos.y * zoom - magnifierSize / 2;
+  // Allow negative bgX/bgY for top and left edges
+const bgX = dragPos.x * zoom - magnifierSize / 2;
+const bgY = dragPos.y * zoom - magnifierSize / 2;
 
-  // Magnifier position relative to handle
-  const magLeft = dragPos.x - magnifierSize / 2;
-  const magTop = dragPos.y - magnifierSize / 2;
+// Magnifier position relative to handle
+const magLeft = dragPos.x - magnifierSize / 2;
+const magTop = dragPos.y - magnifierSize / 2;
 
   return (
     <div ref={containerRef} className="relative inline-block w-full">

@@ -202,11 +202,11 @@ function FreeformCropper({ src, onCropChange }) {
           alt="To crop"
         />
 
-        {/* Polygon overlay */}
+        {/* Polygon overlay - Made transparent */}
         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
           <polygon
             points={corners.map((p) => `${p.x},${p.y}`).join(" ")}
-            fill="rgba(59,130,246,0.2)"
+            fill="none"  {/* Changed to transparent */}
             stroke="rgba(59,130,246,0.8)"
             strokeWidth={2}
           />

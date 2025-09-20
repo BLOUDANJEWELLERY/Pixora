@@ -126,7 +126,7 @@ function FreeformCropper({ src, onCropChange }) {
         ))}
 
         {/* Magnifier Preview */}
-   {/* Magnifier Preview */}
+{/* Magnifier Preview */}
 {draggingIndex !== null && (
   <div
     className="absolute border-2 border-blue-500 rounded-full overflow-hidden pointer-events-none"
@@ -144,15 +144,13 @@ function FreeformCropper({ src, onCropChange }) {
       }px`,
     }}
   >
-    {/* Corner marker (center point) */}
-    <div
-      className="absolute w-3 h-3 bg-red-500 rounded-full border border-white"
-      style={{
-        left: "50%",
-        top: "50%",
-        transform: "translate(-50%, -50%)",
-      }}
-    />
+    {/* Crosshair marker */}
+    <div className="absolute inset-0 flex items-center justify-center">
+      {/* Vertical line */}
+      <div className="absolute w-0.5 h-6 bg-red-500" />
+      {/* Horizontal line */}
+      <div className="absolute w-6 h-0.5 bg-red-500" />
+    </div>
   </div>
 )}
 </div>

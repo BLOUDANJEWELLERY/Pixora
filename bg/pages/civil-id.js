@@ -4,11 +4,11 @@ import React, { useState, useRef, useEffect } from "react";
 
 function FreeformCropper({ src, onCropChange }) {
   const [corners, setCorners] = useState([]);
-  const [draggingIndex, setDraggingIndex] = useState(null);
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
   const [rotation, setRotation] = useState(0);
-  const imgRef = useRef(null);
-  const containerRef = useRef(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const magnifierSize = 100;
   const zoom = 2;
@@ -32,22 +32,23 @@ function FreeformCropper({ src, onCropChange }) {
     else img.onload = initCorners;
   }, [src]);
 
-  const startDrag = (index) => (e) => {
+  const startDrag = (index: number) => (e: MouseEvent | TouchEvent) => {
     e.preventDefault();
     setDraggingIndex(index);
   };
 
   const stopDrag = () => setDraggingIndex(null);
 
-  const onDrag = (e) => {
-    if (draggingIndex === null || !containerRef.current) return;
+  const onDrag = (e: MouseEvent | TouchEvent) => {
+    if (draggingIndex === null || !containerRef.current || !imgRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const clientX = e.clientX ?? e.touches?.[0]?.clientX;
-    const clientY = e.clientY ?? e.touches?.[0]?.clientY;
+    const clientX = "clientX" in e ? e.clientX : e.touches?.[0]?.clientX;
+    const clientY = "clientY" in e ? e.clientY : e.touches?.[0]?.clientY;
+    if (clientX === undefined || clientY === undefined) return;
 
-    // Clamp handle strictly inside the image
-    const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
-    const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
+    // Clamp handle strictly inside image
+    const x = Math.min(Math.max(clientX - rect.left, 0), imgRef.current.width);
+    const y = Math.min(Math.max(clientY - rect.top, 0), imgRef.current.height);
 
     setDragPos({ x, y });
 
@@ -99,9 +100,25 @@ function FreeformCropper({ src, onCropChange }) {
     onCropChange(canvas.toDataURL("image/png"));
   };
 
-  // Calculate magnifier background position
-  const bgX = dragPos.x * zoom - magnifierSize / 2;
-  const bgY = dragPos.y * zoom - magnifierSize / 2;
+  // Magnifier background position with proper edge handling
+  const bgX = Math.max(
+    0,
+    Math.min(dragPos.x * zoom - magnifierSize / 2, imgRef.current?.width! * zoom - magnifierSize)
+  );
+  const bgY = Math.max(
+    0,
+    Math.min(dragPos.y * zoom - magnifierSize / 2, imgRef.current?.height! * zoom - magnifierSize)
+  );
+
+  // Magnifier position relative to handle
+  const magLeft =
+    dragPos.x < magnifierSize / 2 ? dragPos.x : dragPos.x > (imgRef.current?.width! - magnifierSize / 2)
+      ? dragPos.x - magnifierSize
+      : dragPos.x - magnifierSize / 2;
+  const magTop =
+    dragPos.y < magnifierSize / 2 ? dragPos.y : dragPos.y > (imgRef.current?.height! - magnifierSize / 2)
+      ? dragPos.y - magnifierSize
+      : dragPos.y - magnifierSize / 2;
 
   return (
     <div ref={containerRef} className="relative inline-block w-full">
@@ -143,20 +160,12 @@ function FreeformCropper({ src, onCropChange }) {
           <div
             className="absolute border-2 border-blue-500 rounded-full overflow-hidden pointer-events-none bg-white"
             style={{
-              left:
-                dragPos.x < magnifierSize / 2
-                  ? dragPos.x
-                  : dragPos.x - magnifierSize,
-              top:
-                dragPos.y < magnifierSize / 2
-                  ? dragPos.y
-                  : dragPos.y - magnifierSize,
+              left: magLeft,
+              top: magTop,
               width: magnifierSize,
               height: magnifierSize,
               backgroundImage: `url(${src})`,
-              backgroundSize: `${imgRef.current.width * zoom}px ${
-                imgRef.current.height * zoom
-              }px`,
+              backgroundSize: `${imgRef.current.width * zoom}px ${imgRef.current.height * zoom}px`,
               backgroundPosition: `-${bgX}px -${bgY}px`,
               backgroundRepeat: "no-repeat",
               backgroundColor: "white",

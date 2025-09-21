@@ -380,17 +380,12 @@ const downloadPDF = () => {
       const availableHeight = a4Height - margin * 2;
       const spacing = availableHeight * 0.1;
 
-      // Both images same size
+      // Same size for both images
       const maxImgHeight = ((availableHeight - spacing) / 2) * 0.7;
       const maxImgWidth = a4Width - margin * 2;
 
-      // Decide final size (keep ratio but match both images)
-      const aspectFront = frontImg.width / frontImg.height;
-      const aspectBack = backImg.width / backImg.height;
-
-      // Fit both into same frame
       const targetHeight = maxImgHeight;
-      const targetWidth = Math.min(targetHeight * aspectFront, maxImgWidth);
+      const targetWidth = maxImgWidth;
 
       const imgWidth = targetWidth;
       const imgHeight = targetHeight;
@@ -401,29 +396,28 @@ const downloadPDF = () => {
       const backX = frontX;
       const backY = frontY + imgHeight + spacing;
 
-      // Background
+      // Background white
       pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, a4Width, a4Height, "F");
 
-      // Rounded image function
+      // Function to draw image with rounded corners
       const addRoundedImage = (img, x, y, w, h, r = 20) => {
-        pdf.saveGraphicsState();
-        pdf.roundedRect(x, y, w, h, r, r, "clip");
-        pdf.addImage(img, "JPEG", x, y, w, h);
-        pdf.restoreGraphicsState();
+        pdf.setFillColor(255, 255, 255);
+        pdf.roundedRect(x, y, w, h, r, r, "F"); // white rounded rect behind
+        pdf.addImage(img, "JPEG", x, y, w, h);  // image on top
       };
 
-      // Add both images identical size + radius
+      // Add both
       addRoundedImage(frontImg, frontX, frontY, imgWidth, imgHeight, 20);
       addRoundedImage(backImg, backX, backY, imgWidth, imgHeight, 20);
 
-      // Watermark (lines + text repeated diagonally)
+      // Watermark repeated diagonally
       if (watermark) {
         pdf.setTextColor(180, 180, 180);
         pdf.setFontSize(30);
 
         const text = watermark.toUpperCase();
-        const step = 200; // spacing between repeats
+        const step = 250;
 
         for (let x = -a4Width; x < a4Width * 2; x += step) {
           for (let y = -a4Height; y < a4Height * 2; y += step) {
@@ -436,7 +430,7 @@ const downloadPDF = () => {
 
             // Top line
             pdf.setDrawColor(180, 180, 180);
-            pdf.setLineWidth(1);
+            pdf.setLineWidth(0.5);
             pdf.line(-textWidth / 2, -linePadding, textWidth / 2, -linePadding);
 
             // Text

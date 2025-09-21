@@ -375,76 +375,83 @@ const downloadPDF = () => {
   frontImg.src = frontPreview;
   backImg.src = backPreview;
 
+  // helper: draw image with rounded corners via canvas
+  const drawRoundedImage = (img: HTMLImageElement, width: number, height: number, radius: number): string => {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return "";
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.beginPath();
+    ctx.moveTo(radius, 0);
+    ctx.lineTo(width - radius, 0);
+    ctx.quadraticCurveTo(width, 0, width, radius);
+    ctx.lineTo(width, height - radius);
+    ctx.quadraticCurveTo(width, height, width - radius, height);
+    ctx.lineTo(radius, height);
+    ctx.quadraticCurveTo(0, height, 0, height - radius);
+    ctx.lineTo(0, radius);
+    ctx.quadraticCurveTo(0, 0, radius, 0);
+    ctx.closePath();
+    ctx.clip();
+
+    ctx.drawImage(img, 0, 0, width, height);
+
+    return canvas.toDataURL("image/png");
+  };
+
   frontImg.onload = () => {
     backImg.onload = () => {
       const availableHeight = a4Height - margin * 2;
-      const spacing = availableHeight * 0.1;
+      const spacing = availableHeight * 0.15;
 
-      // Same size for both images
-      const maxImgHeight = ((availableHeight - spacing) / 2) * 0.7;
-      const maxImgWidth = a4Width - margin * 2;
+      // ensure both images same size
+      const maxImgHeight = (availableHeight - spacing) / 2;
+      const imgWidth = a4Width - margin * 2;
+      const imgHeight = maxImgHeight;
 
-      const targetHeight = maxImgHeight;
-      const targetWidth = maxImgWidth;
-
-      const imgWidth = targetWidth;
-      const imgHeight = targetHeight;
-
-      const frontX = (a4Width - imgWidth) / 2;
-      const frontY = margin + (availableHeight / 2 - imgHeight - spacing / 2) / 2;
-
-      const backX = frontX;
+      const frontX = margin;
+      const frontY = margin;
+      const backX = margin;
       const backY = frontY + imgHeight + spacing;
 
-      // Background white
       pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, a4Width, a4Height, "F");
 
-      // Function to draw image with rounded corners
-      const addRoundedImage = (img, x, y, w, h, r = 20) => {
-        pdf.setFillColor(255, 255, 255);
-        pdf.roundedRect(x, y, w, h, r, r, "F"); // white rounded rect behind
-        pdf.addImage(img, "JPEG", x, y, w, h);  // image on top
-      };
+      const roundedFront = drawRoundedImage(frontImg, imgWidth, imgHeight, 20);
+      const roundedBack = drawRoundedImage(backImg, imgWidth, imgHeight, 20);
 
-      // Add both
-      addRoundedImage(frontImg, frontX, frontY, imgWidth, imgHeight, 20);
-      addRoundedImage(backImg, backX, backY, imgWidth, imgHeight, 20);
+      pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
+      pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-      // Watermark repeated diagonally
-// Watermark repeated diagonally
-if (watermark) {
-  pdf.setTextColor(180, 180, 180);
-  pdf.setFontSize(30);
+      // Watermark
+      if (watermark) {
+        pdf.setTextColor(180, 180, 180);
+        pdf.setFontSize(30);
 
-  const text = watermark.toUpperCase();
-  const step = 250; // spacing between watermarks
-  const angle = -45; // diagonal direction
+        const text = watermark.toUpperCase();
+        const step = 250;
+        const angle = -45;
 
-  for (let x = -a4Width; x < a4Width * 2; x += step) {
-    for (let y = -a4Height; y < a4Height * 2; y += step) {
-      pdf.save(); // save current state
-      pdf.translate(x, y);
-      pdf.rotate((angle * Math.PI) / 180);
+        for (let x = -a4Width; x < a4Width * 2; x += step) {
+          for (let y = -a4Height; y < a4Height * 2; y += step) {
+            pdf.saveGraphicsState?.(); // safe call, only if available
+            pdf.setDrawColor(180, 180, 180);
+            pdf.setLineWidth(0.5);
 
-      const textWidth = pdf.getTextWidth(text);
-      const linePadding = 10;
+            pdf.text(text, x, y, { angle });
 
-      // Top line
-      pdf.setDrawColor(180, 180, 180);
-      pdf.setLineWidth(0.5);
-      pdf.line(-textWidth / 2, -linePadding, textWidth / 2, -linePadding);
+            const textWidth = pdf.getTextWidth(text);
+            const offset = 12;
+            pdf.line(x - textWidth / 2, y - offset, x + textWidth / 2, y - offset);
+            pdf.line(x - textWidth / 2, y + offset, x + textWidth / 2, y + offset);
 
-      // Text
-      pdf.text(text, 0, 0, { align: "center" });
-
-      // Bottom line
-      pdf.line(-textWidth / 2, linePadding, textWidth / 2, linePadding);
-
-      pdf.restore(); // restore state
-    }
-  }
-}
+            pdf.restoreGraphicsState?.();
+          }
+        }
+      }
 
       pdf.save("civil-id.pdf");
     };

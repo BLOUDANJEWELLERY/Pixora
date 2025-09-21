@@ -299,6 +299,9 @@ const handleCropChange = (dataUrl, type) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+const [originalFrontPreview, setOriginalFrontPreview] = useState(null);
+  const [originalBackPreview, setOriginalBackPreview] = useState(null);
+
   const handleFileChange = (e, type) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -306,9 +309,19 @@ const handleCropChange = (dataUrl, type) => {
     if (type === "front") {
       setFrontFile(file);
       setFrontPreview(previewUrl);
+      setOriginalFrontPreview(previewUrl);
     } else {
       setBackFile(file);
       setBackPreview(previewUrl);
+      setOriginalBackPreview(previewUrl);
+    }
+  };
+
+  const resetImage = (type) => {
+    if (type === "front" && originalFrontPreview) {
+      setFrontPreview(originalFrontPreview);
+    } else if (type === "back" && originalBackPreview) {
+      setBackPreview(originalBackPreview);
     }
   };
 
@@ -335,8 +348,13 @@ const handleCropChange = (dataUrl, type) => {
 
       const data = await res.json();
 
-      setFrontPreview(`data:image/jpeg;base64,${data.front}`);
-      setBackPreview(`data:image/jpeg;base64,${data.back}`);
+      const frontDataUrl = `data:image/jpeg;base64,${data.front}`;
+      const backDataUrl = `data:image/jpeg;base64,${data.back}`;
+      
+      setFrontPreview(frontDataUrl);
+      setBackPreview(backDataUrl);
+      setOriginalFrontPreview(frontDataUrl);
+      setOriginalBackPreview(backDataUrl);
     } catch (e) {
       setError("Failed to process Civil ID. Try again.");
       console.error(e);
@@ -399,39 +417,6 @@ const handleCropChange = (dataUrl, type) => {
       };
     };
   };
-
- 
-  {/*useEffect(() => {
-    if (editingImage) {
-      // Store the current scroll position
-      const scrollY = window.scrollY;
-      
-      // Prevent scrolling
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.body.style.overflow = 'hidden';
-      
-      // Add touch event prevention
-      const preventDefault = (e) => e.preventDefault();
-      document.addEventListener('touchmove', preventDefault, { passive: false });
-      
-      return () => {
-        // Re-enable scrolling and restore scroll position
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        document.body.style.overflow = '';
-        
-        if (scrollY) {
-          window.scrollTo(0, parseInt(scrollY || '0') * -1);
-        }
-        
-        // Remove touch event prevention
-        document.removeEventListener('touchmove', preventDefault);
-      };
-    }
-  }, [editingImage]);*/}
 
 useEffect(() => {
   if (editingImage) {
@@ -512,37 +497,54 @@ useEffect(() => {
         {error && <p className="text-red-600 font-semibold">{error}</p>}
       </div>
 
-{frontPreview && (
-  <div className="relative">
-    <img
-      src={frontPreview}
-      alt="Front"
-      className="border border-blue-300 shadow-md rounded-xl"
-    />
-    <button
-      onClick={() => openCropper("front")}
-      className="absolute top-2 right-2 bg-blue-600 text-white px-3 py-1 rounded shadow hover:bg-blue-700"
-    >
-      Edit
-    </button>
-  </div>
-)}
+      {frontPreview && (
+        <div className="relative mt-4">
+          <img
+            src={frontPreview}
+            alt="Front"
+            className="border border-blue-300 shadow-md rounded-xl max-w-full"
+          />
+          <div className="absolute top-2 right-2 flex gap-2">
+            <button
+              onClick={() => openCropper("front")}
+              className="bg-blue-600 text-white px-3 py-1 rounded shadow hover:bg-blue-700"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => resetImage("front")}
+              className="bg-gray-600 text-white px-3 py-1 rounded shadow hover:bg-gray-700"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      )}
 
-{backPreview && (
-  <div className="relative">
-    <img
-      src={backPreview}
-      alt="Back"
-      className="border border-blue-300 shadow-md rounded-xl"
-    />
-    <button
-      onClick={() => openCropper("back")}
-      className="absolute top-2 right-2 bg-blue-600 text-white px-3 py-1 rounded shadow hover:bg-blue-700"
-    >
-      Edit
-    </button>
-  </div>
-)}
+      {backPreview && (
+        <div className="relative mt-4">
+          <img
+            src={backPreview}
+            alt="Back"
+            className="border border-blue-300 shadow-md rounded-xl max-w-full"
+          />
+          <div className="absolute top-2 right-2 flex gap-2">
+            <button
+              onClick={() => openCropper("back")}
+              className="bg-blue-600 text-white px-3 py-1 rounded shadow hover:bg-blue-700"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => resetImage("back")}
+              className="bg-gray-600 text-white px-3 py-1 rounded shadow hover:bg-gray-700"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      )}
+      
          <button
           onClick={downloadPDF}
           disabled={loading}

@@ -543,6 +543,13 @@ useEffect(() => {
     </button>
   </div>
 )}
+         <button
+          onClick={downloadPDF}
+          disabled={loading}
+          className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 w-full"
+        >
+          {loading ? "Downloading Pdf..." : "Download Pdf"}
+        </button>
         
 {editingImage && (
   <div 

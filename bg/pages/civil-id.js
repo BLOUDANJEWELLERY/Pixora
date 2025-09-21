@@ -412,37 +412,39 @@ const downloadPDF = () => {
       addRoundedImage(backImg, backX, backY, imgWidth, imgHeight, 20);
 
       // Watermark repeated diagonally
-      if (watermark) {
-        pdf.setTextColor(180, 180, 180);
-        pdf.setFontSize(30);
+// Watermark repeated diagonally
+if (watermark) {
+  pdf.setTextColor(180, 180, 180);
+  pdf.setFontSize(30);
 
-        const text = watermark.toUpperCase();
-        const step = 250;
+  const text = watermark.toUpperCase();
+  const step = 250; // spacing between watermarks
+  const angle = -45; // diagonal direction
 
-        for (let x = -a4Width; x < a4Width * 2; x += step) {
-          for (let y = -a4Height; y < a4Height * 2; y += step) {
-            pdf.saveGraphicsState();
-            pdf.translate(x, y);
-            pdf.rotate((-45 * Math.PI) / 180);
+  for (let x = -a4Width; x < a4Width * 2; x += step) {
+    for (let y = -a4Height; y < a4Height * 2; y += step) {
+      pdf.save(); // save current state
+      pdf.translate(x, y);
+      pdf.rotate((angle * Math.PI) / 180);
 
-            const textWidth = pdf.getTextWidth(text);
-            const linePadding = 10;
+      const textWidth = pdf.getTextWidth(text);
+      const linePadding = 10;
 
-            // Top line
-            pdf.setDrawColor(180, 180, 180);
-            pdf.setLineWidth(0.5);
-            pdf.line(-textWidth / 2, -linePadding, textWidth / 2, -linePadding);
+      // Top line
+      pdf.setDrawColor(180, 180, 180);
+      pdf.setLineWidth(0.5);
+      pdf.line(-textWidth / 2, -linePadding, textWidth / 2, -linePadding);
 
-            // Text
-            pdf.text(text, 0, 0, { align: "center" });
+      // Text
+      pdf.text(text, 0, 0, { align: "center" });
 
-            // Bottom line
-            pdf.line(-textWidth / 2, linePadding, textWidth / 2, linePadding);
+      // Bottom line
+      pdf.line(-textWidth / 2, linePadding, textWidth / 2, linePadding);
 
-            pdf.restoreGraphicsState();
-          }
-        }
-      }
+      pdf.restore(); // restore state
+    }
+  }
+}
 
       pdf.save("civil-id.pdf");
     };

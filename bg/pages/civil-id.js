@@ -2,7 +2,7 @@
 import jsPDF from "jspdf";
 import React, { useState, useRef, useEffect } from "react";
 
-function FreeformCropper({ src, onCropChange }) {
+function FreeformCropper({ src, onCropChange, initialCropData }) {
   const [corners, setCorners] = React.useState([]);
   const [draggingIndex, setDraggingIndex] = React.useState(null);
   const [dragPos, setDragPos] = React.useState({ x: 0, y: 0 });
@@ -15,19 +15,25 @@ function FreeformCropper({ src, onCropChange }) {
 
   const magnifierSize = 100;
   const zoom = 2;
-  const magnifierOffset = 20; // Offset from cursor
+  const magnifierOffset = 20;
 
-  // Initialize corners
+  // Initialize corners with saved data or default
   const initCorners = React.useCallback(() => {
     if (!imgRef.current) return;
     const img = imgRef.current;
-    setCorners([
-      { x: 0, y: 0 },
-      { x: img.width, y: 0 },
-      { x: img.width, y: img.height },
-      { x: 0, y: img.height },
-    ]);
-  }, []);
+    
+    if (initialCropData && initialCropData.corners) {
+      setCorners(initialCropData.corners);
+      setRotation(initialCropData.rotation || 0);
+    } else {
+      setCorners([
+        { x: 0, y: 0 },
+        { x: img.width, y: 0 },
+        { x: img.width, y: img.height },
+        { x: 0, y: img.height },
+      ]);
+    }
+  }, [initialCropData]);
 
   React.useEffect(() => {
     const img = imgRef.current;
@@ -146,36 +152,8 @@ function FreeformCropper({ src, onCropChange }) {
   }, [onDrag, stopDrag]);
 
   const handleCrop = () => {
-    if (!imgRef.current) return;
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const img = imgRef.current;
-    const scaleX = img.naturalWidth / img.width;
-    const scaleY = img.naturalHeight / img.height;
-
-    const xs = corners.map((p) => p.x * scaleX);
-    const ys = corners.map((p) => p.y * scaleY);
-    const minX = Math.min(...xs);
-    const minY = Math.min(...ys);
-    const maxX = Math.max(...xs);
-    const maxY = Math.max(...ys);
-
-    const width = maxX - minX;
-    const height = maxY - minY;
-
-    canvas.width = width;
-    canvas.height = height;
-
-    ctx.translate(width / 2, height / 2);
-    ctx.rotate((rotation * Math.PI) / 180);
-    ctx.translate(-width / 2, -height / 2);
-
-    ctx.drawImage(img, minX, minY, width, height, 0, 0, width, height);
-    onCropChange(canvas.toDataURL("image/png"));
-    
-    setRotation(0);
+    // Instead of cropping, just return the crop data
+    onCropChange({ corners, rotation });
   };
 
   // Calculate magnifier position (offset from handle)
@@ -265,7 +243,7 @@ function FreeformCropper({ src, onCropChange }) {
         onClick={handleCrop}
         className="mt-2 bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-2 px-4 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 select-none"
       >
-        Crop
+        Save Crop Settings
       </button>
     </div>
   );
@@ -273,24 +251,7 @@ function FreeformCropper({ src, onCropChange }) {
 
 // Main Civil ID Page
 export default function CivilIdPage() {
-const [editingImage, setEditingImage] = useState(null); // "front" | "back" | null
-
-const openCropper = (type) => {
-  setEditingImage(type);
-  document.body.style.overflow = "hidden"; // stop page scroll
-};
-
-const closeCropper = () => {
-  setEditingImage(null);
-  document.body.style.overflow = "auto"; // restore page scroll
-};
-
-const handleCropChange = (dataUrl, type) => {
-  if (type === "front") setFrontPreview(dataUrl);
-  else if (type === "back") setBackPreview(dataUrl);
-};
-
-  
+  const [editingImage, setEditingImage] = useState(null);
   const [frontFile, setFrontFile] = useState(null);
   const [backFile, setBackFile] = useState(null);
   const [frontPreview, setFrontPreview] = useState(null);
@@ -298,6 +259,77 @@ const handleCropChange = (dataUrl, type) => {
   const [watermark, setWatermark] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Store crop data instead of cropped images
+  const [frontCropData, setFrontCropData] = useState(null);
+  const [backCropData, setBackCropData] = useState(null);
+
+  const openCropper = (type) => {
+    setEditingImage(type);
+    document.body.style.overflow = "hidden";
+  };
+
+  const closeCropper = () => {
+    setEditingImage(null);
+    document.body.style.overflow = "auto";
+  };
+
+  const handleCropChange = (cropData, type) => {
+    if (type === "front") {
+      setFrontCropData(cropData);
+      // Generate preview with crop overlay
+      generatePreview(type, cropData);
+    } else if (type === "back") {
+      setBackCropData(cropData);
+      generatePreview(type, cropData);
+    }
+    closeCropper();
+  };
+
+  const generatePreview = (type, cropData) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Draw the original image
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0, img.width, img.height);
+
+      // Draw the crop polygon overlay
+      ctx.strokeStyle = "rgba(59,130,246,0.8)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cropData.corners[0].x, cropData.corners[0].y);
+      for (let i = 1; i < cropData.corners.length; i++) {
+        ctx.lineTo(cropData.corners[i].x, cropData.corners[i].y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+
+      // Draw handles
+      ctx.fillStyle = "blue";
+      cropData.corners.forEach(corner => {
+        ctx.beginPath();
+        ctx.arc(corner.x, corner.y, 8, 0, 2 * Math.PI);
+        ctx.fill();
+      });
+
+      if (type === "front") {
+        setFrontPreview(canvas.toDataURL("image/png"));
+      } else {
+        setBackPreview(canvas.toDataURL("image/png"));
+      }
+    };
+    
+    if (type === "front" && frontFile) {
+      img.src = URL.createObjectURL(frontFile);
+    } else if (type === "back" && backFile) {
+      img.src = URL.createObjectURL(backFile);
+    }
+  };
 
   const handleFileChange = (e, type) => {
     const file = e.target.files[0];
@@ -306,9 +338,11 @@ const handleCropChange = (dataUrl, type) => {
     if (type === "front") {
       setFrontFile(file);
       setFrontPreview(previewUrl);
+      setFrontCropData(null); // Reset crop data when new file is uploaded
     } else {
       setBackFile(file);
       setBackPreview(previewUrl);
+      setBackCropData(null);
     }
   };
 
@@ -335,8 +369,17 @@ const handleCropChange = (dataUrl, type) => {
 
       const data = await res.json();
 
-      setFrontPreview(`data:image/jpeg;base64,${data.front}`);
-      setBackPreview(`data:image/jpeg;base64,${data.back}`);
+      // Store the processed images but don't apply crop yet
+      const frontProcessed = `data:image/jpeg;base64,${data.front}`;
+      const backProcessed = `data:image/jpeg;base64,${data.back}`;
+      
+      // Update previews with processed images
+      setFrontPreview(frontProcessed);
+      setBackPreview(backProcessed);
+      
+      // Reset crop data since the image has changed
+      setFrontCropData(null);
+      setBackCropData(null);
     } catch (e) {
       setError("Failed to process Civil ID. Try again.");
       console.error(e);
@@ -344,126 +387,163 @@ const handleCropChange = (dataUrl, type) => {
     setLoading(false);
   };
 
-  const downloadPDF = () => {
-    if (!frontPreview || !backPreview) return;
+  const applyCrop = (img, cropData) => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return resolve(img.src);
 
-    const pdf = new jsPDF("p", "pt", "a4");
-    const a4Width = 595;
-    const a4Height = 842;
-    const margin = 20;
+      const scaleX = img.naturalWidth / img.width;
+      const scaleY = img.naturalHeight / img.height;
 
-    const frontImg = new Image();
-    const backImg = new Image();
-    frontImg.src = frontPreview;
-    backImg.src = backPreview;
+      const xs = cropData.corners.map((p) => p.x * scaleX);
+      const ys = cropData.corners.map((p) => p.y * scaleY);
+      const minX = Math.min(...xs);
+      const minY = Math.min(...ys);
+      const maxX = Math.max(...xs);
+      const maxY = Math.max(...ys);
 
-    frontImg.onload = () => {
-      backImg.onload = () => {
-        const availableHeight = a4Height - margin * 2;
-        const spacing = availableHeight * 0.1;
-        const maxImgHeight = (availableHeight - spacing) / 2 * 0.7;
+      const width = maxX - minX;
+      const height = maxY - minY;
 
-        let frontRatio = frontImg.width / frontImg.height;
-        let frontHeight = maxImgHeight;
-        let frontWidth = frontHeight * frontRatio;
-        if (frontWidth > a4Width - margin * 2) {
-          frontWidth = a4Width - margin * 2;
-          frontHeight = frontWidth / frontRatio;
-        }
-        const frontX = (a4Width - frontWidth) / 2;
-        const frontY = margin + (availableHeight / 2 - frontHeight - spacing/2) / 2;
+      canvas.width = width;
+      canvas.height = height;
 
-        let backRatio = backImg.width / backImg.height;
-        let backHeight = maxImgHeight;
-        let backWidth = backHeight * backRatio;
-        if (backWidth > a4Width - margin * 2) {
-          backWidth = a4Width - margin * 2;
-          backHeight = backWidth / backRatio;
-        }
-        const backX = (a4Width - backWidth) / 2;
-        const backY = frontY + frontHeight + spacing;
+      ctx.translate(width / 2, height / 2);
+      ctx.rotate((cropData.rotation * Math.PI) / 180);
+      ctx.translate(-width / 2, -height / 2);
 
-        pdf.setFillColor(255, 255, 255);
-        pdf.rect(0, 0, a4Width, a4Height, "F");
-
-        pdf.addImage(frontImg, "JPEG", frontX, frontY, frontWidth, frontHeight);
-        pdf.addImage(backImg, "JPEG", backX, backY, backWidth, backHeight);
-
-        if (watermark) {
-          pdf.setTextColor(180, 180, 180);
-          pdf.setFontSize(50);
-          pdf.text(watermark, a4Width / 2, a4Height / 2, { align: "center", angle: -45 });
-        }
-
-        pdf.save("civil-id.pdf");
-      };
-    };
+      ctx.drawImage(img, minX, minY, width, height, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/png"));
+    });
   };
 
- 
-  {/*useEffect(() => {
-    if (editingImage) {
-      // Store the current scroll position
-      const scrollY = window.scrollY;
+  const downloadPDF = async () => {
+    if (!frontPreview || !backPreview) return;
+
+    setLoading(true);
+    
+    try {
+      const pdf = new jsPDF("p", "pt", "a4");
+      const a4Width = 595;
+      const a4Height = 842;
+      const margin = 20;
+
+      // Create images for cropping
+      const frontImg = new Image();
+      const backImg = new Image();
       
-      // Prevent scrolling
+      // Apply crop if crop data exists
+      let frontSrc = frontPreview;
+      let backSrc = backPreview;
+      
+      if (frontCropData) {
+        frontSrc = await new Promise((resolve) => {
+          frontImg.onload = async () => {
+            resolve(await applyCrop(frontImg, frontCropData));
+          };
+          frontImg.src = frontPreview;
+        });
+      }
+      
+      if (backCropData) {
+        backSrc = await new Promise((resolve) => {
+          backImg.onload = async () => {
+            resolve(await applyCrop(backImg, backCropData));
+          };
+          backImg.src = backPreview;
+        });
+      }
+
+      // Now load the (possibly cropped) images
+      const finalFrontImg = new Image();
+      const finalBackImg = new Image();
+      
+      await new Promise((resolve) => {
+        let loaded = 0;
+        const checkLoaded = () => {
+          loaded++;
+          if (loaded === 2) resolve();
+        };
+        
+        finalFrontImg.onload = checkLoaded;
+        finalBackImg.onload = checkLoaded;
+        
+        finalFrontImg.src = frontSrc;
+        finalBackImg.src = backSrc;
+      });
+
+      const availableHeight = a4Height - margin * 2;
+      const spacing = availableHeight * 0.1;
+      const maxImgHeight = (availableHeight - spacing) / 2 * 0.7;
+
+      let frontRatio = finalFrontImg.width / finalFrontImg.height;
+      let frontHeight = maxImgHeight;
+      let frontWidth = frontHeight * frontRatio;
+      if (frontWidth > a4Width - margin * 2) {
+        frontWidth = a4Width - margin * 2;
+        frontHeight = frontWidth / frontRatio;
+      }
+      const frontX = (a4Width - frontWidth) / 2;
+      const frontY = margin + (availableHeight / 2 - frontHeight - spacing/2) / 2;
+
+      let backRatio = finalBackImg.width / finalBackImg.height;
+      let backHeight = maxImgHeight;
+      let backWidth = backHeight * backRatio;
+      if (backWidth > a4Width - margin * 2) {
+        backWidth = a4Width - margin * 2;
+        backHeight = backWidth / backRatio;
+      }
+      const backX = (a4Width - backWidth) / 2;
+      const backY = frontY + frontHeight + spacing;
+
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, a4Width, a4Height, "F");
+
+      pdf.addImage(finalFrontImg, "JPEG", frontX, frontY, frontWidth, frontHeight);
+      pdf.addImage(finalBackImg, "JPEG", backX, backY, backWidth, backHeight);
+
+      if (watermark) {
+        pdf.setTextColor(180, 180, 180);
+        pdf.setFontSize(50);
+        pdf.text(watermark, a4Width / 2, a4Height / 2, { align: "center", angle: -45 });
+      }
+
+      pdf.save("civil-id.pdf");
+    } catch (e) {
+      console.error("Error creating PDF:", e);
+      setError("Failed to create PDF. Please try again.");
+    }
+    
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (editingImage) {
+      const scrollY = window.scrollY;
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
       document.body.style.overflow = 'hidden';
+    } else {
+      const scrollY = document.body.style.top;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
       
-      // Add touch event prevention
-      const preventDefault = (e) => e.preventDefault();
-      document.addEventListener('touchmove', preventDefault, { passive: false });
-      
-      return () => {
-        // Re-enable scrolling and restore scroll position
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        document.body.style.overflow = '';
-        
-        if (scrollY) {
-          window.scrollTo(0, parseInt(scrollY || '0') * -1);
-        }
-        
-        // Remove touch event prevention
-        document.removeEventListener('touchmove', preventDefault);
-      };
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
     }
-  }, [editingImage]);*/}
-
-useEffect(() => {
-  if (editingImage) {
-    // Store the current scroll position
-    const scrollY = window.scrollY;
     
-    // Prevent scrolling
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = '100%';
-    document.body.style.overflow = 'hidden';
-  } else {
-    // Re-enable scrolling and restore scroll position
-    const scrollY = document.body.style.top;
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.width = '';
-    document.body.style.overflow = '';
-    
-    if (scrollY) {
-      window.scrollTo(0, parseInt(scrollY || '0') * -1);
-    }
-  }
-  
-  // Cleanup function
-  return () => {
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.width = '';
-    document.body.style.overflow = '';
-  };
-}, [editingImage]);
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+    };
+  }, [editingImage]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
@@ -512,84 +592,87 @@ useEffect(() => {
         {error && <p className="text-red-600 font-semibold">{error}</p>}
       </div>
 
-{frontPreview && (
-  <div className="relative">
-    <img
-      src={frontPreview}
-      alt="Front"
-      className="border border-blue-300 shadow-md rounded-xl"
-    />
-    <button
-      onClick={() => openCropper("front")}
-      className="absolute top-2 right-2 bg-blue-600 text-white px-3 py-1 rounded shadow hover:bg-blue-700"
-    >
-      Edit
-    </button>
-  </div>
-)}
+      {frontPreview && (
+        <div className="relative mt-6">
+          <img
+            src={frontPreview}
+            alt="Front"
+            className="border border-blue-300 shadow-md rounded-xl max-w-full"
+          />
+          <button
+            onClick={() => openCropper("front")}
+            className="absolute top-2 right-2 bg-blue-600 text-white px-3 py-1 rounded shadow hover:bg-blue-700"
+          >
+            Edit
+          </button>
+        </div>
+      )}
 
-{backPreview && (
-  <div className="relative">
-    <img
-      src={backPreview}
-      alt="Back"
-      className="border border-blue-300 shadow-md rounded-xl"
-    />
-    <button
-      onClick={() => openCropper("back")}
-      className="absolute top-2 right-2 bg-blue-600 text-white px-3 py-1 rounded shadow hover:bg-blue-700"
-    >
-      Edit
-    </button>
-  </div>
-)}
-         <button
+      {backPreview && (
+        <div className="relative mt-6">
+          <img
+            src={backPreview}
+            alt="Back"
+            className="border border-blue-300 shadow-md rounded-xl max-w-full"
+          />
+          <button
+            onClick={() => openCropper("back")}
+            className="absolute top-2 right-2 bg-blue-600 text-white px-3 py-1 rounded shadow hover:bg-blue-700"
+          >
+            Edit
+          </button>
+        </div>
+      )}
+      
+      {(frontPreview || backPreview) && (
+        <button
           onClick={downloadPDF}
           disabled={loading}
-          className="bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 w-full"
+          className="mt-6 bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-3 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 w-full max-w-xl"
         >
-          {loading ? "Downloading Pdf..." : "Download Pdf"}
+          {loading ? "Downloading PDF..." : "Download PDF"}
         </button>
-        
-{editingImage && (
-  <div 
-    className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6 select-none"
-    style={{ 
-      position: 'fixed', 
-      top: 0, 
-      left: 0, 
-      right: 0, 
-      bottom: 0,
-      overflow: 'hidden'
-    }}
-    onTouchMove={(e) => {
-      // Only prevent default if the touch is on the modal background, not the cropper
-      const isBackground = e.target === e.currentTarget;
-      const isModalContent = e.target.closest('.modal-content');
+      )}
       
-      if (isBackground || isModalContent) {
-        e.preventDefault();
-      }
-    }}
-  >
-    <div 
-      className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto modal-content select-none"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <h2 className="text-xl font-semibold text-blue-900 mb-4">Edit Image</h2>
-      <FreeformCropper
-        src={editingImage === "front" ? frontPreview : backPreview}
-        onCropChange={(dataUrl) => handleCropChange(dataUrl, editingImage)}
-      />
-      <button
-        onClick={closeCropper}
-        className="mt-4 bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 select-none"
-      >
-        Done
-      </button>
-    </div>
-  </div>
-)}
+      {editingImage && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6 select-none"
+          style={{ 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0,
+            overflow: 'hidden'
+          }}
+          onTouchMove={(e) => {
+            const isBackground = e.target === e.currentTarget;
+            const isModalContent = e.target.closest('.modal-content');
+            
+            if (isBackground || isModalContent) {
+              e.preventDefault();
+            }
+          }}
+        >
+          <div 
+            className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto modal-content select-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-semibold text-blue-900 mb-4">Edit Image</h2>
+            <FreeformCropper
+              src={editingImage === "front" ? frontPreview : backPreview}
+              initialCropData={editingImage === "front" ? frontCropData : backCropData}
+              onCropChange={(cropData) => handleCropChange(cropData, editingImage)}
+            />
+            <button
+              onClick={closeCropper}
+              className="mt-4 bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 px-6 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 select-none"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

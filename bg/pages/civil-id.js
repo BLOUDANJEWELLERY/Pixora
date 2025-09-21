@@ -263,6 +263,10 @@ export default function CivilIdPage() {
   // Store crop data instead of cropped images
   const [frontCropData, setFrontCropData] = useState(null);
   const [backCropData, setBackCropData] = useState(null);
+  
+  // Store original images for processing
+  const [originalFrontImage, setOriginalFrontImage] = useState(null);
+  const [originalBackImage, setOriginalBackImage] = useState(null);
 
   const openCropper = (type) => {
     setEditingImage(type);
@@ -277,7 +281,6 @@ export default function CivilIdPage() {
   const handleCropChange = (cropData, type) => {
     if (type === "front") {
       setFrontCropData(cropData);
-      // Generate preview with crop overlay
       generatePreview(type, cropData);
     } else if (type === "back") {
       setBackCropData(cropData);
@@ -293,29 +296,39 @@ export default function CivilIdPage() {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // Draw the original image
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0, img.width, img.height);
+      // Create a temporary canvas to apply rotation
+      const tempCanvas = document.createElement("canvas");
+      const tempCtx = tempCanvas.getContext("2d");
+      
+      // Rotate the image first
+      tempCanvas.width = img.width;
+      tempCanvas.height = img.height;
+      
+      tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+      tempCtx.rotate((cropData.rotation * Math.PI) / 180);
+      tempCtx.translate(-tempCanvas.width / 2, -tempCanvas.height / 2);
+      tempCtx.drawImage(img, 0, 0);
+      
+      // Now crop the rotated image
+      const xs = cropData.corners.map((p) => p.x);
+      const ys = cropData.corners.map((p) => p.y);
+      const minX = Math.min(...xs);
+      const minY = Math.min(...ys);
+      const maxX = Math.max(...xs);
+      const maxY = Math.max(...ys);
 
-      // Draw the crop polygon overlay
-      ctx.strokeStyle = "rgba(59,130,246,0.8)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(cropData.corners[0].x, cropData.corners[0].y);
-      for (let i = 1; i < cropData.corners.length; i++) {
-        ctx.lineTo(cropData.corners[i].x, cropData.corners[i].y);
-      }
-      ctx.closePath();
-      ctx.stroke();
+      const width = maxX - minX;
+      const height = maxY - minY;
 
-      // Draw handles
-      ctx.fillStyle = "blue";
-      cropData.corners.forEach(corner => {
-        ctx.beginPath();
-        ctx.arc(corner.x, corner.y, 8, 0, 2 * Math.PI);
-        ctx.fill();
-      });
+      canvas.width = width;
+      canvas.height = height;
+      
+      // Draw only the cropped area
+      ctx.drawImage(
+        tempCanvas,
+        minX, minY, width, height,
+        0, 0, width, height
+      );
 
       if (type === "front") {
         setFrontPreview(canvas.toDataURL("image/png"));
@@ -324,10 +337,10 @@ export default function CivilIdPage() {
       }
     };
     
-    if (type === "front" && frontFile) {
-      img.src = URL.createObjectURL(frontFile);
-    } else if (type === "back" && backFile) {
-      img.src = URL.createObjectURL(backFile);
+    if (type === "front" && originalFrontImage) {
+      img.src = originalFrontImage;
+    } else if (type === "back" && originalBackImage) {
+      img.src = originalBackImage;
     }
   };
 
@@ -337,10 +350,12 @@ export default function CivilIdPage() {
     const previewUrl = URL.createObjectURL(file);
     if (type === "front") {
       setFrontFile(file);
+      setOriginalFrontImage(previewUrl);
       setFrontPreview(previewUrl);
-      setFrontCropData(null); // Reset crop data when new file is uploaded
+      setFrontCropData(null);
     } else {
       setBackFile(file);
+      setOriginalBackImage(previewUrl);
       setBackPreview(previewUrl);
       setBackCropData(null);
     }
@@ -373,13 +388,27 @@ export default function CivilIdPage() {
       const frontProcessed = `data:image/jpeg;base64,${data.front}`;
       const backProcessed = `data:image/jpeg;base64,${data.back}`;
       
-      // Update previews with processed images
-      setFrontPreview(frontProcessed);
-      setBackPreview(backProcessed);
+      // Update original images with processed ones
+      setOriginalFrontImage(frontProcessed);
+      setOriginalBackImage(backProcessed);
       
-      // Reset crop data since the image has changed
-      setFrontCropData(null);
-      setBackCropData(null);
+      // Show the processed images with default crop areas
+      const defaultCropData = {
+        corners: [
+          { x: 0, y: 0 },
+          { x: 500, y: 0 }, // Default width
+          { x: 500, y: 300 }, // Default height
+          { x: 0, y: 300 }
+        ],
+        rotation: 0
+      };
+      
+      setFrontCropData(defaultCropData);
+      setBackCropData(defaultCropData);
+      
+      // Generate previews with default crop areas
+      generatePreview("front", defaultCropData);
+      generatePreview("back", defaultCropData);
     } catch (e) {
       setError("Failed to process Civil ID. Try again.");
       console.error(e);
@@ -393,6 +422,20 @@ export default function CivilIdPage() {
       const ctx = canvas.getContext("2d");
       if (!ctx) return resolve(img.src);
 
+      // Create a temporary canvas to apply rotation
+      const tempCanvas = document.createElement("canvas");
+      const tempCtx = tempCanvas.getContext("2d");
+      
+      // Rotate the image first
+      tempCanvas.width = img.width;
+      tempCanvas.height = img.height;
+      
+      tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+      tempCtx.rotate((cropData.rotation * Math.PI) / 180);
+      tempCtx.translate(-tempCanvas.width / 2, -tempCanvas.height / 2);
+      tempCtx.drawImage(img, 0, 0);
+      
+      // Now crop the rotated image
       const scaleX = img.naturalWidth / img.width;
       const scaleY = img.naturalHeight / img.height;
 
@@ -409,11 +452,7 @@ export default function CivilIdPage() {
       canvas.width = width;
       canvas.height = height;
 
-      ctx.translate(width / 2, height / 2);
-      ctx.rotate((cropData.rotation * Math.PI) / 180);
-      ctx.translate(-width / 2, -height / 2);
-
-      ctx.drawImage(img, minX, minY, width, height, 0, 0, width, height);
+      ctx.drawImage(tempCanvas, minX, minY, width, height, 0, 0, width, height);
       resolve(canvas.toDataURL("image/png"));
     });
   };
@@ -434,15 +473,15 @@ export default function CivilIdPage() {
       const backImg = new Image();
       
       // Apply crop if crop data exists
-      let frontSrc = frontPreview;
-      let backSrc = backPreview;
+      let frontSrc = originalFrontImage;
+      let backSrc = originalBackImage;
       
       if (frontCropData) {
         frontSrc = await new Promise((resolve) => {
           frontImg.onload = async () => {
             resolve(await applyCrop(frontImg, frontCropData));
           };
-          frontImg.src = frontPreview;
+          frontImg.src = originalFrontImage;
         });
       }
       
@@ -451,11 +490,11 @@ export default function CivilIdPage() {
           backImg.onload = async () => {
             resolve(await applyCrop(backImg, backCropData));
           };
-          backImg.src = backPreview;
+          backImg.src = originalBackImage;
         });
       }
 
-      // Now load the (possibly cropped) images
+      // Now load the cropped images
       const finalFrontImg = new Image();
       const finalBackImg = new Image();
       
@@ -660,7 +699,7 @@ export default function CivilIdPage() {
           >
             <h2 className="text-xl font-semibold text-blue-900 mb-4">Edit Image</h2>
             <FreeformCropper
-              src={editingImage === "front" ? frontPreview : backPreview}
+              src={editingImage === "front" ? originalFrontImage : originalBackImage}
               initialCropData={editingImage === "front" ? frontCropData : backCropData}
               onCropChange={(cropData) => handleCropChange(cropData, editingImage)}
             />

@@ -376,7 +376,7 @@ const downloadPDF = () => {
   backImg.src = backPreview;
 
   // helper: draw image with rounded corners via canvas
-  const drawRoundedImage = (img: HTMLImageElement, width: number, height: number, radius: number): string => {
+  const drawRoundedImage = (img, width, height, radius) => {
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
@@ -437,7 +437,6 @@ const downloadPDF = () => {
 
         for (let x = -a4Width; x < a4Width * 2; x += step) {
           for (let y = -a4Height; y < a4Height * 2; y += step) {
-            pdf.saveGraphicsState?.(); // safe call, only if available
             pdf.setDrawColor(180, 180, 180);
             pdf.setLineWidth(0.5);
 
@@ -447,8 +446,6 @@ const downloadPDF = () => {
             const offset = 12;
             pdf.line(x - textWidth / 2, y - offset, x + textWidth / 2, y - offset);
             pdf.line(x - textWidth / 2, y + offset, x + textWidth / 2, y + offset);
-
-            pdf.restoreGraphicsState?.();
           }
         }
       }

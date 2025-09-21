@@ -360,7 +360,7 @@ const [originalFrontPreview, setOriginalFrontPreview] = useState(null);
     setLoading(false);
   };
 
-drawRoundedImageToDataURL(img: HTMLImageElement, width: number, height: number, radius: number) {
+ const drawRoundedImageToDataURL(img: HTMLImageElement, width: number, height: number, radius: number) {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;

@@ -375,37 +375,41 @@ const downloadPDF = () => {
   frontImg.src = frontPreview;
   backImg.src = backPreview;
 
-  function drawRoundedImageToDataURL(img, targetW, targetH, radius) {
-    const canvas = document.createElement("canvas");
-    canvas.width = targetW;
-    canvas.height = targetH;
-    const ctx = canvas.getContext("2d");
+function drawRoundedImageToDataURL(img, targetW, targetH, radius) {
+  const canvas = document.createElement("canvas");
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext("2d");
 
-    ctx.clearRect(0, 0, targetW, targetH);
-    ctx.beginPath();
-    ctx.moveTo(radius, 0);
-    ctx.lineTo(targetW - radius, 0);
-    ctx.quadraticCurveTo(targetW, 0, targetW, radius);
-    ctx.lineTo(targetW, targetH - radius);
-    ctx.quadraticCurveTo(targetW, targetH, targetW - radius, targetH);
-    ctx.lineTo(radius, targetH);
-    ctx.quadraticCurveTo(0, targetH, 0, targetH - radius);
-    ctx.lineTo(0, radius);
-    ctx.quadraticCurveTo(0, 0, radius, 0);
-    ctx.closePath();
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-    ctx.clip();
+  ctx.clearRect(0, 0, targetW, targetH);
 
-    const scale = Math.max(targetW / img.width, targetH / img.height);
-    const drawW = img.width * scale;
-    const drawH = img.height * scale;
-    const offsetX = (targetW - drawW) / 2;
-    const offsetY = (targetH - drawH) / 2;
-    ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+  // Rounded rect path
+  ctx.beginPath();
+  ctx.moveTo(radius, 0);
+  ctx.lineTo(targetW - radius, 0);
+  ctx.quadraticCurveTo(targetW, 0, targetW, radius);
+  ctx.lineTo(targetW, targetH - radius);
+  ctx.quadraticCurveTo(targetW, targetH, targetW - radius, targetH);
+  ctx.lineTo(radius, targetH);
+  ctx.quadraticCurveTo(0, targetH, 0, targetH - radius);
+  ctx.lineTo(0, radius);
+  ctx.quadraticCurveTo(0, 0, radius, 0);
+  ctx.closePath();
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.clip();
 
-    return canvas.toDataURL("image/png");
-  }
+  // ✅ Use contain scaling (no cut, may add white space)
+  const scale = Math.min(targetW / img.width, targetH / img.height);
+  const drawW = img.width * scale;
+  const drawH = img.height * scale;
+  const offsetX = (targetW - drawW) / 2;
+  const offsetY = (targetH - drawH) / 2;
+
+  ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+
+  return canvas.toDataURL("image/png");
+}
 
   frontImg.onload = () => {
     backImg.onload = () => {

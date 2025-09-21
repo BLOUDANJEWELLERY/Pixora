@@ -379,60 +379,82 @@ const downloadPDF = () => {
     backImg.onload = () => {
       const availableHeight = a4Height - margin * 2;
       const spacing = availableHeight * 0.1;
+
+      // Both images same size
       const maxImgHeight = ((availableHeight - spacing) / 2) * 0.7;
+      const maxImgWidth = a4Width - margin * 2;
 
-      // FRONT IMAGE
-      let frontRatio = frontImg.width / frontImg.height;
-      let frontHeight = maxImgHeight;
-      let frontWidth = frontHeight * frontRatio;
-      if (frontWidth > a4Width - margin * 2) {
-        frontWidth = a4Width - margin * 2;
-        frontHeight = frontWidth / frontRatio;
-      }
-      const frontX = (a4Width - frontWidth) / 2;
-      const frontY = margin + (availableHeight / 2 - frontHeight - spacing / 2) / 2;
+      // Decide final size (keep ratio but match both images)
+      const aspectFront = frontImg.width / frontImg.height;
+      const aspectBack = backImg.width / backImg.height;
 
-      // BACK IMAGE
-      let backRatio = backImg.width / backImg.height;
-      let backHeight = maxImgHeight;
-      let backWidth = backHeight * backRatio;
-      if (backWidth > a4Width - margin * 2) {
-        backWidth = a4Width - margin * 2;
-        backHeight = backWidth / backRatio;
-      }
-      const backX = (a4Width - backWidth) / 2;
-      const backY = frontY + frontHeight + spacing;
+      // Fit both into same frame
+      const targetHeight = maxImgHeight;
+      const targetWidth = Math.min(targetHeight * aspectFront, maxImgWidth);
 
-      // White background
+      const imgWidth = targetWidth;
+      const imgHeight = targetHeight;
+
+      const frontX = (a4Width - imgWidth) / 2;
+      const frontY = margin + (availableHeight / 2 - imgHeight - spacing / 2) / 2;
+
+      const backX = frontX;
+      const backY = frontY + imgHeight + spacing;
+
+      // Background
       pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, a4Width, a4Height, "F");
 
-      // Draw rounded image function
-      const addRoundedImage = (img, x, y, w, h, r = 12) => {
+      // Rounded image function
+      const addRoundedImage = (img, x, y, w, h, r = 20) => {
         pdf.saveGraphicsState();
         pdf.roundedRect(x, y, w, h, r, r, "clip");
         pdf.addImage(img, "JPEG", x, y, w, h);
         pdf.restoreGraphicsState();
       };
 
-      // Add both images with rounded corners
-      addRoundedImage(frontImg, frontX, frontY, frontWidth, frontHeight, 15);
-      addRoundedImage(backImg, backX, backY, backWidth, backHeight, 15);
+      // Add both images identical size + radius
+      addRoundedImage(frontImg, frontX, frontY, imgWidth, imgHeight, 20);
+      addRoundedImage(backImg, backX, backY, imgWidth, imgHeight, 20);
 
-      // Watermark
+      // Watermark (lines + text repeated diagonally)
       if (watermark) {
         pdf.setTextColor(180, 180, 180);
-        pdf.setFontSize(50);
-        pdf.text(watermark, a4Width / 2, a4Height / 2, {
-          align: "center",
-          angle: -45,
-        });
+        pdf.setFontSize(30);
+
+        const text = watermark.toUpperCase();
+        const step = 200; // spacing between repeats
+
+        for (let x = -a4Width; x < a4Width * 2; x += step) {
+          for (let y = -a4Height; y < a4Height * 2; y += step) {
+            pdf.saveGraphicsState();
+            pdf.translate(x, y);
+            pdf.rotate((-45 * Math.PI) / 180);
+
+            const textWidth = pdf.getTextWidth(text);
+            const linePadding = 10;
+
+            // Top line
+            pdf.setDrawColor(180, 180, 180);
+            pdf.setLineWidth(1);
+            pdf.line(-textWidth / 2, -linePadding, textWidth / 2, -linePadding);
+
+            // Text
+            pdf.text(text, 0, 0, { align: "center" });
+
+            // Bottom line
+            pdf.line(-textWidth / 2, linePadding, textWidth / 2, linePadding);
+
+            pdf.restoreGraphicsState();
+          }
+        }
       }
 
       pdf.save("civil-id.pdf");
     };
   };
 };
+
 
 useEffect(() => {
   if (editingImage) {

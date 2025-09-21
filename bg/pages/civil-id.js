@@ -360,30 +360,20 @@ const [originalFrontPreview, setOriginalFrontPreview] = useState(null);
     setLoading(false);
   };
 
-const downloadPDF = () => {
-  if (!frontPreview || !backPreview) return;
-
-  const pdf = new jsPDF("p", "pt", "a4");
-  const a4Width = 595;
-  const a4Height = 842;
-  const margin = 140; // increased margin → smaller images
-
-  const frontImg = new Image();
-  const backImg = new Image();
-  frontImg.crossOrigin = "anonymous";
-  backImg.crossOrigin = "anonymous";
-  frontImg.src = frontPreview;
-  backImg.src = backPreview;
-
 function drawRoundedImageToDataURL(img, targetW, targetH, radius) {
   const canvas = document.createElement("canvas");
-  canvas.width = targetW;
-  canvas.height = targetH;
+
+  // Higher resolution for sharpness
+  const scaleFactor = 4; // 4x resolution → very crisp
+  canvas.width = targetW * scaleFactor;
+  canvas.height = targetH * scaleFactor;
+
   const ctx = canvas.getContext("2d");
+  ctx.scale(scaleFactor, scaleFactor);
 
   ctx.clearRect(0, 0, targetW, targetH);
 
-  // Rounded rect path
+  // Rounded rectangle path (civil ID style)
   ctx.beginPath();
   ctx.moveTo(radius, 0);
   ctx.lineTo(targetW - radius, 0);
@@ -395,14 +385,15 @@ function drawRoundedImageToDataURL(img, targetW, targetH, radius) {
   ctx.lineTo(0, radius);
   ctx.quadraticCurveTo(0, 0, radius, 0);
   ctx.closePath();
+
   ctx.fillStyle = "#ffffff";
   ctx.fill();
   ctx.clip();
 
-  // ✅ Use contain scaling (no cut, may add white space)
-  const scale = Math.min(targetW / img.width, targetH / img.height);
-  const drawW = img.width * scale;
-  const drawH = img.height * scale;
+  // Scale image to fit inside without distortion
+  const scale = Math.min(targetW / img.naturalWidth, targetH / img.naturalHeight);
+  const drawW = img.naturalWidth * scale;
+  const drawH = img.naturalHeight * scale;
   const offsetX = (targetW - drawW) / 2;
   const offsetY = (targetH - drawH) / 2;
 
@@ -411,84 +402,68 @@ function drawRoundedImageToDataURL(img, targetW, targetH, radius) {
   return canvas.toDataURL("image/png");
 }
 
+function downloadPDF() {
+  if (!frontPreview || !backPreview) return;
+
+  const pdf = new jsPDF("p", "pt", "a4");
+  const a4Width = 595;
+  const a4Height = 842;
+  const margin = 40;
+
+  const frontImg = new Image();
+  const backImg = new Image();
+  frontImg.src = frontPreview;
+  backImg.src = backPreview;
+
   frontImg.onload = () => {
     backImg.onload = () => {
       const availableHeight = a4Height - margin * 2;
-      const spacing = Math.round(availableHeight * 0.20); // bit more space between images
-      const finalImgHeight = Math.round((availableHeight - spacing) / 2);
-      const finalImgWidth = Math.round(a4Width - margin * 1.7);
+      const spacing = 50;
+      const maxImgHeight = (availableHeight - spacing) / 2;
 
-      const frontX = margin;
+      const imgWidth = a4Width - margin * 4;
+      const imgHeight = maxImgHeight;
+
+      const frontX = (a4Width - imgWidth) / 2;
       const frontY = margin;
-      const backX = margin;
-      const backY = frontY + finalImgHeight + spacing;
+
+      const backX = frontX;
+      const backY = frontY + imgHeight + spacing;
+
+      // Civil ID card style → bigger corner radius
+      const radius = imgHeight / 6;
+
+      const roundedFront = drawRoundedImageToDataURL(frontImg, imgWidth, imgHeight, radius);
+      const roundedBack = drawRoundedImageToDataURL(backImg, imgWidth, imgHeight, radius);
 
       pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, a4Width, a4Height, "F");
 
-      const cornerRadius = Math.round(Math.min(finalImgWidth, finalImgHeight) * 0.05); // slightly larger radius
-      const roundedFront = drawRoundedImageToDataURL(frontImg, finalImgWidth, finalImgHeight, cornerRadius);
-      const roundedBack = drawRoundedImageToDataURL(backImg, finalImgWidth, finalImgHeight, cornerRadius);
+      pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
+      pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-      if (roundedFront) pdf.addImage(roundedFront, "PNG", frontX, frontY, finalImgWidth, finalImgHeight);
-      if (roundedBack) pdf.addImage(roundedBack, "PNG", backX, backY, finalImgWidth, finalImgHeight);
-
-      // Watermark
       if (watermark) {
-        const wmCanvas = document.createElement("canvas");
-        wmCanvas.width = a4Width;
-        wmCanvas.height = a4Height;
-        const wctx = wmCanvas.getContext("2d");
+        pdf.setTextColor(160, 160, 160);
+        pdf.setFontSize(70); // Bigger text
+        pdf.setFont("helvetica", "bold");
 
-        const text = String(watermark).toUpperCase();
-        const fontSize = 38; // bigger font size
-        const watermarkOpacity = 0.12;
-        const step = 240;
-        const angle = -45 * (Math.PI / 180);
-        const linePadding = 14;
+        // Diagonal watermark lines
+        pdf.setDrawColor(160, 160, 160);
+        pdf.setLineWidth(1.5);
+        pdf.line(0, 0, a4Width, a4Height);
+        pdf.line(0, 50, a4Width - 50, a4Height);
 
-        wctx.clearRect(0, 0, wmCanvas.width, wmCanvas.height);
-        wctx.globalAlpha = watermarkOpacity;
-        wctx.fillStyle = "rgba(0,0,0,1)";
-        wctx.strokeStyle = "rgba(0,0,0,1)";
-        wctx.lineWidth = 1;
-        wctx.font = `bold ${fontSize}px Arial`;
-        wctx.textAlign = "center";
-        wctx.textBaseline = "middle";
-
-        for (let x = -wmCanvas.width; x < wmCanvas.width * 2; x += step) {
-          for (let y = -wmCanvas.height; y < wmCanvas.height * 2; y += step) {
-            wctx.save();
-            wctx.translate(x, y);
-            wctx.rotate(angle);
-
-            const textMetrics = wctx.measureText(text);
-            const textW = Math.max(1, textMetrics.width);
-
-            wctx.beginPath();
-            wctx.moveTo(-textW / 2 - 10, -linePadding);
-            wctx.lineTo(textW / 2 + 10, -linePadding);
-            wctx.stroke();
-
-            wctx.fillText(text, 0, 0);
-
-            wctx.beginPath();
-            wctx.moveTo(-textW / 2 - 10, linePadding);
-            wctx.lineTo(textW / 2 + 10, linePadding);
-            wctx.stroke();
-
-            wctx.restore();
-          }
-        }
-
-        const wmDataUrl = wmCanvas.toDataURL("image/png");
-        pdf.addImage(wmDataUrl, "PNG", 0, 0, a4Width, a4Height);
+        // Centered watermark text
+        pdf.text(watermark, a4Width / 2, a4Height / 2, {
+          align: "center",
+          angle: -45,
+        });
       }
 
       pdf.save("civil-id.pdf");
     };
   };
-};
+}
 
 
 useEffect(() => {

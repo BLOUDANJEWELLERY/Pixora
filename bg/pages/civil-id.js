@@ -353,68 +353,86 @@ const [originalFrontPreview, setOriginalFrontPreview] = useState(null);
       
       setFrontPreview(frontDataUrl);
       setBackPreview(backDataUrl);
-      } catch (e) {
+      setOriginalFrontPreview(frontDataUrl);
+      setOriginalBackPreview(backDataUrl);
+    } catch (e) {
       setError("Failed to process Civil ID. Try again.");
       console.error(e);
     }
     setLoading(false);
   };
 
-  const downloadPDF = () => {
-    if (!frontPreview || !backPreview) return;
+const downloadPDF = () => {
+  if (!frontPreview || !backPreview) return;
 
-    const pdf = new jsPDF("p", "pt", "a4");
-    const a4Width = 595;
-    const a4Height = 842;
-    const margin = 20;
+  const pdf = new jsPDF("p", "pt", "a4");
+  const a4Width = 595;
+  const a4Height = 842;
+  const margin = 20;
 
-    const frontImg = new Image();
-    const backImg = new Image();
-    frontImg.src = frontPreview;
-    backImg.src = backPreview;
+  const frontImg = new Image();
+  const backImg = new Image();
+  frontImg.src = frontPreview;
+  backImg.src = backPreview;
 
-    frontImg.onload = () => {
-      backImg.onload = () => {
-        const availableHeight = a4Height - margin * 2;
-        const spacing = availableHeight * 0.1;
-        const maxImgHeight = (availableHeight - spacing) / 2 * 0.7;
+  frontImg.onload = () => {
+    backImg.onload = () => {
+      const availableHeight = a4Height - margin * 2;
+      const spacing = availableHeight * 0.1;
+      const maxImgHeight = ((availableHeight - spacing) / 2) * 0.7;
 
-        let frontRatio = frontImg.width / frontImg.height;
-        let frontHeight = maxImgHeight;
-        let frontWidth = frontHeight * frontRatio;
-        if (frontWidth > a4Width - margin * 2) {
-          frontWidth = a4Width - margin * 2;
-          frontHeight = frontWidth / frontRatio;
-        }
-        const frontX = (a4Width - frontWidth) / 2;
-        const frontY = margin + (availableHeight / 2 - frontHeight - spacing/2) / 2;
+      // FRONT IMAGE
+      let frontRatio = frontImg.width / frontImg.height;
+      let frontHeight = maxImgHeight;
+      let frontWidth = frontHeight * frontRatio;
+      if (frontWidth > a4Width - margin * 2) {
+        frontWidth = a4Width - margin * 2;
+        frontHeight = frontWidth / frontRatio;
+      }
+      const frontX = (a4Width - frontWidth) / 2;
+      const frontY = margin + (availableHeight / 2 - frontHeight - spacing / 2) / 2;
 
-        let backRatio = backImg.width / backImg.height;
-        let backHeight = maxImgHeight;
-        let backWidth = backHeight * backRatio;
-        if (backWidth > a4Width - margin * 2) {
-          backWidth = a4Width - margin * 2;
-          backHeight = backWidth / backRatio;
-        }
-        const backX = (a4Width - backWidth) / 2;
-        const backY = frontY + frontHeight + spacing;
+      // BACK IMAGE
+      let backRatio = backImg.width / backImg.height;
+      let backHeight = maxImgHeight;
+      let backWidth = backHeight * backRatio;
+      if (backWidth > a4Width - margin * 2) {
+        backWidth = a4Width - margin * 2;
+        backHeight = backWidth / backRatio;
+      }
+      const backX = (a4Width - backWidth) / 2;
+      const backY = frontY + frontHeight + spacing;
 
-        pdf.setFillColor(255, 255, 255);
-        pdf.rect(0, 0, a4Width, a4Height, "F");
+      // White background
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, a4Width, a4Height, "F");
 
-        pdf.addImage(frontImg, "JPEG", frontX, frontY, frontWidth, frontHeight);
-        pdf.addImage(backImg, "JPEG", backX, backY, backWidth, backHeight);
-
-        if (watermark) {
-          pdf.setTextColor(180, 180, 180);
-          pdf.setFontSize(50);
-          pdf.text(watermark, a4Width / 2, a4Height / 2, { align: "center", angle: -45 });
-        }
-
-        pdf.save("civil-id.pdf");
+      // Draw rounded image function
+      const addRoundedImage = (img, x, y, w, h, r = 12) => {
+        pdf.saveGraphicsState();
+        pdf.roundedRect(x, y, w, h, r, r, "clip");
+        pdf.addImage(img, "JPEG", x, y, w, h);
+        pdf.restoreGraphicsState();
       };
+
+      // Add both images with rounded corners
+      addRoundedImage(frontImg, frontX, frontY, frontWidth, frontHeight, 15);
+      addRoundedImage(backImg, backX, backY, backWidth, backHeight, 15);
+
+      // Watermark
+      if (watermark) {
+        pdf.setTextColor(180, 180, 180);
+        pdf.setFontSize(50);
+        pdf.text(watermark, a4Width / 2, a4Height / 2, {
+          align: "center",
+          angle: -45,
+        });
+      }
+
+      pdf.save("civil-id.pdf");
     };
   };
+};
 
 useEffect(() => {
   if (editingImage) {

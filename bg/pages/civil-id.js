@@ -15,7 +15,7 @@ function FreeformCropper({ src, onCropChange }) {
 
   const magnifierSize = 100;
   const zoom = 2;
-  const magnifierOffset = 20; // Offset from cursor
+  const magnifierOffset = 20;
 
   // Initialize corners
   const initCorners = React.useCallback(() => {
@@ -147,35 +147,16 @@ function FreeformCropper({ src, onCropChange }) {
 
   const handleCrop = () => {
     if (!imgRef.current) return;
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const img = imgRef.current;
-    const scaleX = img.naturalWidth / img.width;
-    const scaleY = img.naturalHeight / img.height;
-
-    const xs = corners.map((p) => p.x * scaleX);
-    const ys = corners.map((p) => p.y * scaleY);
-    const minX = Math.min(...xs);
-    const minY = Math.min(...ys);
-    const maxX = Math.max(...xs);
-    const maxY = Math.max(...ys);
-
-    const width = maxX - minX;
-    const height = maxY - minY;
-
-    canvas.width = width;
-    canvas.height = height;
-
-    ctx.translate(width / 2, height / 2);
-    ctx.rotate((rotation * Math.PI) / 180);
-    ctx.translate(-width / 2, -height / 2);
-
-    ctx.drawImage(img, minX, minY, width, height, 0, 0, width, height);
-    onCropChange(canvas.toDataURL("image/png"));
     
-    setRotation(0);
+    // Instead of cropping the image, just return the crop coordinates and rotation
+    const cropData = {
+      corners: [...corners],
+      rotation,
+      imageWidth: imgRef.current.width,
+      imageHeight: imgRef.current.height
+    };
+    
+    onCropChange(cropData);
   };
 
   // Calculate magnifier position (offset from handle)
@@ -196,7 +177,7 @@ function FreeformCropper({ src, onCropChange }) {
   }
 
   return (
-    <div ref={containerRef} className="relative inline-block w-full">
+    <div ref={containerRef} className="relative inline-block w-full select-none">
       <div className="relative" style={{ overflow: 'visible' }}>
         <img
           src={src}
@@ -204,6 +185,8 @@ function FreeformCropper({ src, onCropChange }) {
           className="block w-full rounded-xl border border-blue-300 select-none"
           style={{ transform: `rotate(${rotation}deg)` }}
           alt="To crop"
+          draggable="false"
+          onDragStart={(e) => e.preventDefault()}
         />
 
         {/* Polygon overlay - Made transparent */}
@@ -265,7 +248,7 @@ function FreeformCropper({ src, onCropChange }) {
         onClick={handleCrop}
         className="mt-2 bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold py-2 px-4 rounded-2xl shadow-xl hover:scale-105 transition-all duration-300 select-none"
       >
-        Crop
+        Save Crop
       </button>
     </div>
   );
@@ -274,6 +257,72 @@ function FreeformCropper({ src, onCropChange }) {
 // Main Civil ID Page
 export default function CivilIdPage() {
 const [editingImage, setEditingImage] = useState(null); // "front" | "back" | null
+
+
+
+
+
+// In your parent component
+const [frontCropData, setFrontCropData] = React.useState(null);
+const [backCropData, setBackCropData] = React.useState(null);
+
+const handleCropChange = (cropData, imageType) => {
+  if (imageType === "front") {
+    setFrontCropData(cropData);
+  } else {
+    setBackCropData(cropData);
+  }
+  closeCropper();
+};
+
+// Function to crop an image using the stored crop data
+const cropImageWithData = (imageSrc, cropData) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      
+      // Calculate scaled coordinates
+      const scaleX = img.naturalWidth / cropData.imageWidth;
+      const scaleY = img.naturalHeight / cropData.imageHeight;
+      
+      const xs = cropData.corners.map((p) => p.x * scaleX);
+      const ys = cropData.corners.map((p) => p.y * scaleY);
+      const minX = Math.min(...xs);
+      const minY = Math.min(...ys);
+      const maxX = Math.max(...xs);
+      const maxY = Math.max(...ys);
+      
+      const width = maxX - minX;
+      const height = maxY - minY;
+      
+      canvas.width = width;
+      canvas.height = height;
+      
+      ctx.translate(width / 2, height / 2);
+      ctx.rotate((cropData.rotation * Math.PI) / 180);
+      ctx.translate(-width / 2, -height / 2);
+      
+      ctx.drawImage(img, minX, minY, width, height, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.src = imageSrc;
+  });
+};
+
+// Function to generate PDF (example)
+const generatePDF = async () => {
+  // Crop images using stored crop data
+  const frontCropped = frontCropData ? await cropImageWithData(frontPreview, frontCropData) : frontPreview;
+  const backCropped = backCropData ? await cropImageWithData(backPreview, backCropData) : backPreview;
+  
+  // Now use frontCropped and backCropped in your PDF generation
+  // Your PDF generation code here...
+};
+
+
+
 
 const openCropper = (type) => {
   setEditingImage(type);
@@ -344,94 +393,89 @@ const handleCropChange = (dataUrl, type) => {
     setLoading(false);
   };
 
-  const downloadPDF = () => {
-    if (!frontPreview || !backPreview) return;
+const downloadPDF = async () => {
+  if (!frontPreview || !backPreview) return;
 
-    const pdf = new jsPDF("p", "pt", "a4");
-    const a4Width = 595;
-    const a4Height = 842;
-    const margin = 20;
+  // Crop images using stored crop data if available
+  let frontCropped = frontPreview;
+  let backCropped = backPreview;
+  
+  if (frontCropData) {
+    frontCropped = await cropImageWithData(frontPreview, frontCropData);
+  }
+  
+  if (backCropData) {
+    backCropped = await cropImageWithData(backPreview, backCropData);
+  }
 
-    const frontImg = new Image();
-    const backImg = new Image();
-    frontImg.src = frontPreview;
-    backImg.src = backPreview;
+  const pdf = new jsPDF("p", "pt", "a4");
+  const a4Width = 595;
+  const a4Height = 842;
+  const margin = 20;
 
-    frontImg.onload = () => {
-      backImg.onload = () => {
-        const availableHeight = a4Height - margin * 2;
-        const spacing = availableHeight * 0.1;
-        const maxImgHeight = (availableHeight - spacing) / 2 * 0.7;
+  const frontImg = new Image();
+  const backImg = new Image();
+  frontImg.src = frontCropped;
+  backImg.src = backCropped;
 
-        let frontRatio = frontImg.width / frontImg.height;
-        let frontHeight = maxImgHeight;
-        let frontWidth = frontHeight * frontRatio;
-        if (frontWidth > a4Width - margin * 2) {
-          frontWidth = a4Width - margin * 2;
-          frontHeight = frontWidth / frontRatio;
-        }
-        const frontX = (a4Width - frontWidth) / 2;
-        const frontY = margin + (availableHeight / 2 - frontHeight - spacing/2) / 2;
-
-        let backRatio = backImg.width / backImg.height;
-        let backHeight = maxImgHeight;
-        let backWidth = backHeight * backRatio;
-        if (backWidth > a4Width - margin * 2) {
-          backWidth = a4Width - margin * 2;
-          backHeight = backWidth / backRatio;
-        }
-        const backX = (a4Width - backWidth) / 2;
-        const backY = frontY + frontHeight + spacing;
-
-        pdf.setFillColor(255, 255, 255);
-        pdf.rect(0, 0, a4Width, a4Height, "F");
-
-        pdf.addImage(frontImg, "JPEG", frontX, frontY, frontWidth, frontHeight);
-        pdf.addImage(backImg, "JPEG", backX, backY, backWidth, backHeight);
-
-        if (watermark) {
-          pdf.setTextColor(180, 180, 180);
-          pdf.setFontSize(50);
-          pdf.text(watermark, a4Width / 2, a4Height / 2, { align: "center", angle: -45 });
-        }
-
-        pdf.save("civil-id.pdf");
+  // Create a promise to wait for both images to load
+  const loadImages = () => {
+    return new Promise((resolve) => {
+      let imagesLoaded = 0;
+      const checkLoaded = () => {
+        imagesLoaded++;
+        if (imagesLoaded === 2) resolve();
       };
-    };
+      
+      frontImg.onload = checkLoaded;
+      backImg.onload = checkLoaded;
+      
+      // In case images are already loaded
+      if (frontImg.complete) checkLoaded();
+      if (backImg.complete) checkLoaded();
+    });
   };
 
- 
-  {/*useEffect(() => {
-    if (editingImage) {
-      // Store the current scroll position
-      const scrollY = window.scrollY;
-      
-      // Prevent scrolling
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.body.style.overflow = 'hidden';
-      
-      // Add touch event prevention
-      const preventDefault = (e) => e.preventDefault();
-      document.addEventListener('touchmove', preventDefault, { passive: false });
-      
-      return () => {
-        // Re-enable scrolling and restore scroll position
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        document.body.style.overflow = '';
-        
-        if (scrollY) {
-          window.scrollTo(0, parseInt(scrollY || '0') * -1);
-        }
-        
-        // Remove touch event prevention
-        document.removeEventListener('touchmove', preventDefault);
-      };
-    }
-  }, [editingImage]);*/}
+  await loadImages();
+
+  const availableHeight = a4Height - margin * 2;
+  const spacing = availableHeight * 0.1;
+  const maxImgHeight = (availableHeight - spacing) / 2 * 0.7;
+
+  let frontRatio = frontImg.width / frontImg.height;
+  let frontHeight = maxImgHeight;
+  let frontWidth = frontHeight * frontRatio;
+  if (frontWidth > a4Width - margin * 2) {
+    frontWidth = a4Width - margin * 2;
+    frontHeight = frontWidth / frontRatio;
+  }
+  const frontX = (a4Width - frontWidth) / 2;
+  const frontY = margin + (availableHeight / 2 - frontHeight - spacing/2) / 2;
+
+  let backRatio = backImg.width / backImg.height;
+  let backHeight = maxImgHeight;
+  let backWidth = backHeight * backRatio;
+  if (backWidth > a4Width - margin * 2) {
+    backWidth = a4Width - margin * 2;
+    backHeight = backWidth / backRatio;
+  }
+  const backX = (a4Width - backWidth) / 2;
+  const backY = frontY + frontHeight + spacing;
+
+  pdf.setFillColor(255, 255, 255);
+  pdf.rect(0, 0, a4Width, a4Height, "F");
+
+  pdf.addImage(frontImg, "JPEG", frontX, frontY, frontWidth, frontHeight);
+  pdf.addImage(backImg, "JPEG", backX, backY, backWidth, backHeight);
+
+  if (watermark) {
+    pdf.setTextColor(180, 180, 180);
+    pdf.setFontSize(50);
+    pdf.text(watermark, a4Width / 2, a4Height / 2, { align: "center", angle: -45 });
+  }
+
+  pdf.save("civil-id.pdf");
+};
 
 useEffect(() => {
   if (editingImage) {
@@ -563,7 +607,6 @@ useEffect(() => {
       overflow: 'hidden'
     }}
     onTouchMove={(e) => {
-      // Only prevent default if the touch is on the modal background, not the cropper
       const isBackground = e.target === e.currentTarget;
       const isModalContent = e.target.closest('.modal-content');
       
@@ -576,10 +619,10 @@ useEffect(() => {
       className="bg-white p-6 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto modal-content select-none"
       onClick={(e) => e.stopPropagation()}
     >
-      <h2 className="text-xl font-semibold text-blue-900 mb-4">Edit Image</h2>
+      <h2 className="text-xl font-semibold text-blue-900 mb-4 select-none">Edit Image</h2>
       <FreeformCropper
         src={editingImage === "front" ? frontPreview : backPreview}
-        onCropChange={(dataUrl) => handleCropChange(dataUrl, editingImage)}
+        onCropChange={(cropData) => handleCropChange(cropData, editingImage)}
       />
       <button
         onClick={closeCropper}

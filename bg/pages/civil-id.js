@@ -412,7 +412,7 @@ const downloadPDF = () => {
       const availableHeight = a4Height - margin * 2;
       const spacing = Math.round(availableHeight * 0.20); // bit more space between images
       const finalImgHeight = Math.round((availableHeight - spacing) / 2);
-      const finalImgWidth = Math.round(a4Width - margin * 1.5);
+      const finalImgWidth = Math.round(a4Width - margin * 1.7);
 
       const frontX = margin;
       const frontY = margin;

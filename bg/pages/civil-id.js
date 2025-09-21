@@ -365,37 +365,34 @@ function drawRoundedImageToDataURL(img, width, height, radius) {
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
-
   if (!ctx) return "";
 
   ctx.clearRect(0, 0, width, height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
 
-  // Smooth rounded rectangle with anti-alias
-  const r = Math.min(radius, width / 2, height / 2);
+  // Draw full rounded rectangle path
   ctx.beginPath();
-  ctx.moveTo(r, 0);
-  ctx.lineTo(width - r, 0);
-  ctx.quadraticCurveTo(width, 0, width, r);
-  ctx.lineTo(width, height - r);
-  ctx.quadraticCurveTo(width, height, width - r, height);
-  ctx.lineTo(r, height);
-  ctx.quadraticCurveTo(0, height, 0, height - r);
-  ctx.lineTo(0, r);
-  ctx.quadraticCurveTo(0, 0, r, 0);
+  ctx.moveTo(radius, 0);
+  ctx.lineTo(width - radius, 0);
+  ctx.quadraticCurveTo(width, 0, width, radius);
+  ctx.lineTo(width, height - radius);
+  ctx.quadraticCurveTo(width, height, width - radius, height);
+  ctx.lineTo(radius, height);
+  ctx.quadraticCurveTo(0, height, 0, height - radius);
+  ctx.lineTo(0, radius);
+  ctx.quadraticCurveTo(0, 0, radius, 0);
   ctx.closePath();
   ctx.clip();
 
-  // Draw image proportionally, centered
+  // Fit image inside the rounded rect without cropping
   const scale = Math.min(width / img.naturalWidth, height / img.naturalHeight);
   const drawW = img.naturalWidth * scale;
   const drawH = img.naturalHeight * scale;
   const offsetX = (width - drawW) / 2;
   const offsetY = (height - drawH) / 2;
 
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
-
   return canvas.toDataURL("image/png");
 }
 
@@ -414,17 +411,16 @@ function downloadPDF() {
 
   frontImg.onload = () => {
     backImg.onload = () => {
-      const spacing = 50;
-      const imgWidth = a4Width - margin * 2;
-      const imgHeight = (a4Height - margin * 2 - spacing) / 2;
-      const radius = imgHeight / 6;
+      const spacing = 40; // space between images
+      const imgWidth = a4Width * 0.7; // smaller width
+      const imgHeight = a4Height * 0.3; // smaller height
+      const radius = 20; // rounded corner radius
 
-      const frontX = margin;
+      const frontX = (a4Width - imgWidth) / 2;
       const frontY = margin;
-      const backX = margin;
+      const backX = frontX;
       const backY = frontY + imgHeight + spacing;
 
-      // Rounded and sharp images
       const roundedFront = drawRoundedImageToDataURL(frontImg, imgWidth, imgHeight, radius);
       const roundedBack = drawRoundedImageToDataURL(backImg, imgWidth, imgHeight, radius);
 
@@ -434,21 +430,19 @@ function downloadPDF() {
       pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
       pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-      // Advanced watermark: text with lines sliding diagonally
       if (watermark) {
         pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(80);
-        pdf.setTextColor(200, 200, 200);
-        pdf.setDrawColor(200, 200, 200);
-        pdf.setLineWidth(1.5);
+        pdf.setFontSize(60);
+        pdf.setTextColor(180, 180, 180);
+        pdf.setDrawColor(180, 180, 180);
+        pdf.setLineWidth(1.2);
 
-        const step = 300; // distance between lines
+        const step = 250;
         for (let y = -a4Height; y < a4Height * 2; y += step) {
-          pdf.line(0, y, a4Width, y + a4Width); // diagonal line top-left to bottom-right
+          pdf.line(0, y, a4Width, y + a4Width); // diagonal line
           pdf.line(0, y + 30, a4Width, y + a4Width + 30); // parallel line
         }
 
-        // Centered text
         pdf.text(watermark, a4Width / 2, a4Height / 2, {
           align: "center",
           angle: -45,

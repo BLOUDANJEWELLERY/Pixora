@@ -366,7 +366,7 @@ const downloadPDF = () => {
   const pdf = new jsPDF("p", "pt", "a4");
   const a4Width = 595;
   const a4Height = 842;
-  const margin = 40; // increased margin → smaller images
+  const margin = 140; // increased margin → smaller images
 
   const frontImg = new Image();
   const backImg = new Image();
@@ -410,7 +410,7 @@ const downloadPDF = () => {
   frontImg.onload = () => {
     backImg.onload = () => {
       const availableHeight = a4Height - margin * 2;
-      const spacing = Math.round(availableHeight * 0.12); // bit more space between images
+      const spacing = Math.round(availableHeight * 0.20); // bit more space between images
       const finalImgHeight = Math.round((availableHeight - spacing) / 2);
       const finalImgWidth = Math.round(a4Width - margin * 2);
 

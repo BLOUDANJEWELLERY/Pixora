@@ -353,9 +353,7 @@ const [originalFrontPreview, setOriginalFrontPreview] = useState(null);
       
       setFrontPreview(frontDataUrl);
       setBackPreview(backDataUrl);
-      setOriginalFrontPreview(frontDataUrl);
-      setOriginalBackPreview(backDataUrl);
-    } catch (e) {
+      } catch (e) {
       setError("Failed to process Civil ID. Try again.");
       console.error(e);
     }

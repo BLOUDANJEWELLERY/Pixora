@@ -360,43 +360,40 @@ const [originalFrontPreview, setOriginalFrontPreview] = useState(null);
     setLoading(false);
   };
 
-function drawRoundedImageToDataURL(img, targetW, targetH, radius) {
+function drawRoundedImageToDataURL(img, width, height, radius) {
   const canvas = document.createElement("canvas");
-
-  // Higher resolution for sharpness
-  const scaleFactor = 4; // 4x resolution → very crisp
-  canvas.width = targetW * scaleFactor;
-  canvas.height = targetH * scaleFactor;
-
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext("2d");
-  ctx.scale(scaleFactor, scaleFactor);
 
-  ctx.clearRect(0, 0, targetW, targetH);
+  if (!ctx) return "";
 
-  // Rounded rectangle path (civil ID style)
+  ctx.clearRect(0, 0, width, height);
+
+  // Smooth rounded rectangle with anti-alias
+  const r = Math.min(radius, width / 2, height / 2);
   ctx.beginPath();
-  ctx.moveTo(radius, 0);
-  ctx.lineTo(targetW - radius, 0);
-  ctx.quadraticCurveTo(targetW, 0, targetW, radius);
-  ctx.lineTo(targetW, targetH - radius);
-  ctx.quadraticCurveTo(targetW, targetH, targetW - radius, targetH);
-  ctx.lineTo(radius, targetH);
-  ctx.quadraticCurveTo(0, targetH, 0, targetH - radius);
-  ctx.lineTo(0, radius);
-  ctx.quadraticCurveTo(0, 0, radius, 0);
+  ctx.moveTo(r, 0);
+  ctx.lineTo(width - r, 0);
+  ctx.quadraticCurveTo(width, 0, width, r);
+  ctx.lineTo(width, height - r);
+  ctx.quadraticCurveTo(width, height, width - r, height);
+  ctx.lineTo(r, height);
+  ctx.quadraticCurveTo(0, height, 0, height - r);
+  ctx.lineTo(0, r);
+  ctx.quadraticCurveTo(0, 0, r, 0);
   ctx.closePath();
-
-  ctx.fillStyle = "#ffffff";
-  ctx.fill();
   ctx.clip();
 
-  // Scale image to fit inside without distortion
-  const scale = Math.min(targetW / img.naturalWidth, targetH / img.naturalHeight);
+  // Draw image proportionally, centered
+  const scale = Math.min(width / img.naturalWidth, height / img.naturalHeight);
   const drawW = img.naturalWidth * scale;
   const drawH = img.naturalHeight * scale;
-  const offsetX = (targetW - drawW) / 2;
-  const offsetY = (targetH - drawH) / 2;
+  const offsetX = (width - drawW) / 2;
+  const offsetY = (height - drawH) / 2;
 
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
 
   return canvas.toDataURL("image/png");
@@ -417,22 +414,17 @@ function downloadPDF() {
 
   frontImg.onload = () => {
     backImg.onload = () => {
-      const availableHeight = a4Height - margin * 2;
       const spacing = 50;
-      const maxImgHeight = (availableHeight - spacing) / 2;
-
-      const imgWidth = a4Width - margin * 4;
-      const imgHeight = maxImgHeight;
-
-      const frontX = (a4Width - imgWidth) / 2;
-      const frontY = margin;
-
-      const backX = frontX;
-      const backY = frontY + imgHeight + spacing;
-
-      // Civil ID card style → bigger corner radius
+      const imgWidth = a4Width - margin * 2;
+      const imgHeight = (a4Height - margin * 2 - spacing) / 2;
       const radius = imgHeight / 6;
 
+      const frontX = margin;
+      const frontY = margin;
+      const backX = margin;
+      const backY = frontY + imgHeight + spacing;
+
+      // Rounded and sharp images
       const roundedFront = drawRoundedImageToDataURL(frontImg, imgWidth, imgHeight, radius);
       const roundedBack = drawRoundedImageToDataURL(backImg, imgWidth, imgHeight, radius);
 
@@ -442,18 +434,21 @@ function downloadPDF() {
       pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
       pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
+      // Advanced watermark: text with lines sliding diagonally
       if (watermark) {
-        pdf.setTextColor(160, 160, 160);
-        pdf.setFontSize(70); // Bigger text
         pdf.setFont("helvetica", "bold");
-
-        // Diagonal watermark lines
-        pdf.setDrawColor(160, 160, 160);
+        pdf.setFontSize(80);
+        pdf.setTextColor(200, 200, 200);
+        pdf.setDrawColor(200, 200, 200);
         pdf.setLineWidth(1.5);
-        pdf.line(0, 0, a4Width, a4Height);
-        pdf.line(0, 50, a4Width - 50, a4Height);
 
-        // Centered watermark text
+        const step = 300; // distance between lines
+        for (let y = -a4Height; y < a4Height * 2; y += step) {
+          pdf.line(0, y, a4Width, y + a4Width); // diagonal line top-left to bottom-right
+          pdf.line(0, y + 30, a4Width, y + a4Width + 30); // parallel line
+        }
+
+        // Centered text
         pdf.text(watermark, a4Width / 2, a4Height / 2, {
           align: "center",
           angle: -45,

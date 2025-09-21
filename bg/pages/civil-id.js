@@ -360,7 +360,7 @@ const [originalFrontPreview, setOriginalFrontPreview] = useState(null);
     setLoading(false);
   };
 
-function drawRoundedImageToDataURL(img, width, height, radius) {
+drawRoundedImageToDataURL(img: HTMLImageElement, width: number, height: number, radius: number) {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -371,7 +371,7 @@ function drawRoundedImageToDataURL(img, width, height, radius) {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  // Draw full rounded rectangle path
+  // Rounded rect path
   ctx.beginPath();
   ctx.moveTo(radius, 0);
   ctx.lineTo(width - radius, 0);
@@ -385,7 +385,7 @@ function drawRoundedImageToDataURL(img, width, height, radius) {
   ctx.closePath();
   ctx.clip();
 
-  // Fit image inside the rounded rect without cropping
+  // Fit image inside rounded rect
   const scale = Math.min(width / img.naturalWidth, height / img.naturalHeight);
   const drawW = img.naturalWidth * scale;
   const drawH = img.naturalHeight * scale;
@@ -393,6 +393,8 @@ function drawRoundedImageToDataURL(img, width, height, radius) {
   const offsetY = (height - drawH) / 2;
 
   ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+
+  // Return PNG with transparency preserved
   return canvas.toDataURL("image/png");
 }
 
@@ -424,8 +426,8 @@ function downloadPDF() {
       const roundedFront = drawRoundedImageToDataURL(frontImg, imgWidth, imgHeight, radius);
       const roundedBack = drawRoundedImageToDataURL(backImg, imgWidth, imgHeight, radius);
 
-      pdf.setFillColor(255, 255, 255);
-      pdf.rect(0, 0, a4Width, a4Height, "F");
+      //pdf.setFillColor(255, 255, 255);
+      //pdf.rect(0, 0, a4Width, a4Height, "F");
 
       pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
       pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);

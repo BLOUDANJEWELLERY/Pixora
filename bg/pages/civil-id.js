@@ -258,10 +258,6 @@ function FreeformCropper({ src, onCropChange }) {
 export default function CivilIdPage() {
 const [editingImage, setEditingImage] = useState(null); // "front" | "back" | null
 
-
-
-
-
 // In your parent component
 const [frontCropData, setFrontCropData] = React.useState(null);
 const [backCropData, setBackCropData] = React.useState(null);
@@ -311,19 +307,6 @@ const cropImageWithData = (imageSrc, cropData) => {
   });
 };
 
-// Function to generate PDF (example)
-const generatePDF = async () => {
-  // Crop images using stored crop data
-  const frontCropped = frontCropData ? await cropImageWithData(frontPreview, frontCropData) : frontPreview;
-  const backCropped = backCropData ? await cropImageWithData(backPreview, backCropData) : backPreview;
-  
-  // Now use frontCropped and backCropped in your PDF generation
-  // Your PDF generation code here...
-};
-
-
-
-
 const openCropper = (type) => {
   setEditingImage(type);
   document.body.style.overflow = "hidden"; // stop page scroll
@@ -333,12 +316,6 @@ const closeCropper = () => {
   setEditingImage(null);
   document.body.style.overflow = "auto"; // restore page scroll
 };
-
-const handleCropChange = (dataUrl, type) => {
-  if (type === "front") setFrontPreview(dataUrl);
-  else if (type === "back") setBackPreview(dataUrl);
-};
-
   
   const [frontFile, setFrontFile] = useState(null);
   const [backFile, setBackFile] = useState(null);

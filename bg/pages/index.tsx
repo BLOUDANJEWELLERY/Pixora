@@ -18,7 +18,7 @@ export default function Home() {
       {/* Feature Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl">
         {/* Background Remover */}
-        <Link href="/background-remover" className="transform hover:scale-105 transition-all">
+        <Link href="/remove-bg" className="transform hover:scale-105 transition-all">
           <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 flex flex-col items-center gap-4 border border-blue-200 border-opacity-30 hover:shadow-[0_0_30px_rgba(59,130,246,0.4)]">
             <h2 className="text-2xl font-semibold text-blue-900">Background Remover</h2>
             <p className="text-blue-900 text-center text-sm">

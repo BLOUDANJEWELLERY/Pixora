@@ -416,12 +416,12 @@ async function downloadPDF() {
   const pdf = new jsPDF("p", "pt", "a4");
   const a4Width = 595;
   const a4Height = 842;
-  const margin = 40;
+  const margin = 80; // Increased top margin
 
   const imgWidth = a4Width * 0.7;
-  const imgHeight = a4Height * 0.3;
-  const radius = 20; // Rounded corner radius
-  const spacing = 40;
+  const imgHeight = a4Height * 0.25; // Slightly smaller to fit better
+  const radius = 20;
+  const spacing = 80; // Increased spacing between images
 
   try {
     // Create rounded images using html2canvas
@@ -430,9 +430,9 @@ async function downloadPDF() {
       createRoundedImageElement(backPreview, imgWidth, imgHeight, radius)
     ]);
 
-    // Calculate positions
+    // Calculate positions - moved downward with more spacing
     const frontX = (a4Width - imgWidth) / 2;
-    const frontY = margin;
+    const frontY = margin + 40; // Additional downward offset
     const backX = frontX;
     const backY = frontY + imgHeight + spacing;
 
@@ -444,23 +444,43 @@ async function downloadPDF() {
     pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
     pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-    // Add watermark if enabled
+    // Add professional watermark
     if (watermark) {
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(60);
-      pdf.setTextColor(180, 180, 180);
-      pdf.setDrawColor(180, 180, 180);
-      pdf.setLineWidth(1.2);
-
-      const step = 250;
-      for (let y = -a4Height; y < a4Height * 2; y += step) {
-        pdf.line(0, y, a4Width, y + a4Width);
-        pdf.line(0, y + 30, a4Width, y + a4Width + 30);
+      // Set watermark style - more professional
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(16);
+      pdf.setTextColor(220, 220, 220); // Lighter gray
+      
+      // Calculate diagonal positioning for watermark
+      const centerX = a4Width / 2;
+      const centerY = a4Height / 2;
+      
+      // Save current graphics state
+      pdf.saveGraphicsState();
+      
+      // Create subtle repeated watermark pattern
+      const textWidth = pdf.getTextWidth(watermark);
+      const patternSpacing = 200;
+      
+      // Draw multiple watermarks in a grid pattern (more professional)
+      for (let x = -a4Width; x < a4Width * 2; x += patternSpacing) {
+        for (let y = -a4Height; y < a4Height * 2; y += patternSpacing) {
+          pdf.text(watermark, x, y, {
+            align: "center",
+            angle: -35 // Subtle angle
+          });
+        }
       }
-
-      pdf.text(watermark, a4Width / 2, a4Height / 2, {
+      
+      // Restore graphics state
+      pdf.restoreGraphicsState();
+      
+      // Add a single centered watermark (backup)
+      pdf.setTextColor(240, 240, 240); // Very light gray
+      pdf.setFontSize(24);
+      pdf.text(watermark, centerX, centerY, {
         align: "center",
-        angle: -45,
+        angle: -45
       });
     }
 
@@ -478,12 +498,12 @@ async function downloadPDFWithProgress(setProgress) {
   const pdf = new jsPDF("p", "pt", "a4");
   const a4Width = 595;
   const a4Height = 842;
-  const margin = 40;
+  const margin = 80; // Increased top margin
 
   const imgWidth = a4Width * 0.7;
-  const imgHeight = a4Height * 0.3;
+  const imgHeight = a4Height * 0.25; // Slightly smaller
   const radius = 20;
-  const spacing = 40;
+  const spacing = 80; // Increased spacing
 
   try {
     if (setProgress) setProgress(10);
@@ -496,9 +516,9 @@ async function downloadPDFWithProgress(setProgress) {
     const roundedBack = await createRoundedImageElement(backPreview, imgWidth, imgHeight, radius);
     if (setProgress) setProgress(90);
 
-    // Calculate positions
+    // Calculate positions - moved downward
     const frontX = (a4Width - imgWidth) / 2;
-    const frontY = margin;
+    const frontY = margin + 40;
     const backX = frontX;
     const backY = frontY + imgHeight + spacing;
 
@@ -510,23 +530,38 @@ async function downloadPDFWithProgress(setProgress) {
     pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
     pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-    // Watermark
+    // Professional watermark
     if (watermark) {
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(60);
-      pdf.setTextColor(180, 180, 180);
-      pdf.setDrawColor(180, 180, 180);
-      pdf.setLineWidth(1.2);
-
-      const step = 250;
-      for (let y = -a4Height; y < a4Height * 2; y += step) {
-        pdf.line(0, y, a4Width, y + a4Width);
-        pdf.line(0, y + 30, a4Width, y + a4Width + 30);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(16);
+      pdf.setTextColor(220, 220, 220);
+      
+      const centerX = a4Width / 2;
+      const centerY = a4Height / 2;
+      
+      pdf.saveGraphicsState();
+      
+      const textWidth = pdf.getTextWidth(watermark);
+      const patternSpacing = 200;
+      
+      // Grid pattern for professional look
+      for (let x = -a4Width; x < a4Width * 2; x += patternSpacing) {
+        for (let y = -a4Height; y < a4Height * 2; y += patternSpacing) {
+          pdf.text(watermark, x, y, {
+            align: "center",
+            angle: -35
+          });
+        }
       }
-
-      pdf.text(watermark, a4Width / 2, a4Height / 2, {
+      
+      pdf.restoreGraphicsState();
+      
+      // Centered watermark
+      pdf.setTextColor(240, 240, 240);
+      pdf.setFontSize(24);
+      pdf.text(watermark, centerX, centerY, {
         align: "center",
-        angle: -45,
+        angle: -45
       });
     }
 

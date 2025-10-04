@@ -362,16 +362,33 @@ const [originalFrontPreview, setOriginalFrontPreview] = useState(null);
     setLoading(false);
   };
 
-function createRoundedImageElement(imgSrc, width, height, radius) {
+function createRoundedImageElement(imgSrc, targetWidth, targetHeight, radius) {
   return new Promise((resolve) => {
     const img = new Image();
     img.src = imgSrc;
     
     img.onload = () => {
+      // Calculate aspect ratio of the original image
+      const imgAspectRatio = img.naturalWidth / img.naturalHeight;
+      const containerAspectRatio = targetWidth / targetHeight;
+      
+      let finalWidth, finalHeight;
+      
+      // Determine best fit without stretching
+      if (imgAspectRatio > containerAspectRatio) {
+        // Image is wider than container
+        finalWidth = targetWidth;
+        finalHeight = targetWidth / imgAspectRatio;
+      } else {
+        // Image is taller than container
+        finalHeight = targetHeight;
+        finalWidth = targetHeight * imgAspectRatio;
+      }
+      
       // Create container div with rounded corners
       const container = document.createElement('div');
-      container.style.width = `${width}px`;
-      container.style.height = `${height}px`;
+      container.style.width = `${targetWidth}px`;
+      container.style.height = `${targetHeight}px`;
       container.style.borderRadius = `${radius}px`;
       container.style.overflow = 'hidden';
       container.style.display = 'flex';
@@ -382,12 +399,12 @@ function createRoundedImageElement(imgSrc, width, height, radius) {
       container.style.left = '-9999px';
       container.style.top = '-9999px';
       
-      // Create image element with proper sizing
+      // Create image element with proper aspect ratio
       const imageElement = document.createElement('img');
       imageElement.src = imgSrc;
-      imageElement.style.width = '100%';
-      imageElement.style.height = '100%';
-      imageElement.style.objectFit = 'contain';
+      imageElement.style.width = `${finalWidth}px`;
+      imageElement.style.height = `${finalHeight}px`;
+      imageElement.style.objectFit = 'cover'; // Changed to cover to fill the area while maintaining aspect ratio
       imageElement.style.borderRadius = `${radius}px`;
       
       container.appendChild(imageElement);
@@ -395,7 +412,7 @@ function createRoundedImageElement(imgSrc, width, height, radius) {
       
       // Use html2canvas to capture the rounded image
       html2canvas(container, {
-        scale: 2, // Higher scale for better quality
+        scale: 2,
         useCORS: true,
         backgroundColor: null,
         logging: false,
@@ -419,7 +436,7 @@ async function downloadPDF() {
   const margin = 80; // Increased top margin
 
   const imgWidth = a4Width * 0.7;
-  const imgHeight = a4Height * 0.25; // Slightly smaller to fit better
+  const imgHeight = a4Height * 0.25;
   const radius = 20;
   const spacing = 80; // Increased spacing between images
 
@@ -444,12 +461,12 @@ async function downloadPDF() {
     pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
     pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-    // Add professional watermark
+    // Add professional watermark with larger font
     if (watermark) {
-      // Set watermark style - more professional
+      // Set watermark style - larger and more professional
       pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(16);
-      pdf.setTextColor(220, 220, 220); // Lighter gray
+      pdf.setFontSize(24); // Increased from 16 to 24
+      pdf.setTextColor(220, 220, 220);
       
       // Calculate diagonal positioning for watermark
       const centerX = a4Width / 2;
@@ -458,16 +475,15 @@ async function downloadPDF() {
       // Save current graphics state
       pdf.saveGraphicsState();
       
-      // Create subtle repeated watermark pattern
-      const textWidth = pdf.getTextWidth(watermark);
-      const patternSpacing = 200;
+      // Create subtle repeated watermark pattern with larger font
+      const patternSpacing = 250;
       
-      // Draw multiple watermarks in a grid pattern (more professional)
+      // Draw multiple watermarks in a grid pattern
       for (let x = -a4Width; x < a4Width * 2; x += patternSpacing) {
         for (let y = -a4Height; y < a4Height * 2; y += patternSpacing) {
           pdf.text(watermark, x, y, {
             align: "center",
-            angle: -35 // Subtle angle
+            angle: -35
           });
         }
       }
@@ -475,9 +491,9 @@ async function downloadPDF() {
       // Restore graphics state
       pdf.restoreGraphicsState();
       
-      // Add a single centered watermark (backup)
-      pdf.setTextColor(240, 240, 240); // Very light gray
-      pdf.setFontSize(24);
+      // Add a single centered watermark with larger font
+      pdf.setTextColor(240, 240, 240);
+      pdf.setFontSize(32); // Increased from 24 to 32
       pdf.text(watermark, centerX, centerY, {
         align: "center",
         angle: -45
@@ -498,12 +514,12 @@ async function downloadPDFWithProgress(setProgress) {
   const pdf = new jsPDF("p", "pt", "a4");
   const a4Width = 595;
   const a4Height = 842;
-  const margin = 80; // Increased top margin
+  const margin = 80;
 
   const imgWidth = a4Width * 0.7;
-  const imgHeight = a4Height * 0.25; // Slightly smaller
+  const imgHeight = a4Height * 0.25;
   const radius = 20;
-  const spacing = 80; // Increased spacing
+  const spacing = 80;
 
   try {
     if (setProgress) setProgress(10);
@@ -530,10 +546,10 @@ async function downloadPDFWithProgress(setProgress) {
     pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
     pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-    // Professional watermark
+    // Professional watermark with larger font
     if (watermark) {
       pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(16);
+      pdf.setFontSize(24); // Increased
       pdf.setTextColor(220, 220, 220);
       
       const centerX = a4Width / 2;
@@ -541,8 +557,7 @@ async function downloadPDFWithProgress(setProgress) {
       
       pdf.saveGraphicsState();
       
-      const textWidth = pdf.getTextWidth(watermark);
-      const patternSpacing = 200;
+      const patternSpacing = 250;
       
       // Grid pattern for professional look
       for (let x = -a4Width; x < a4Width * 2; x += patternSpacing) {
@@ -556,9 +571,9 @@ async function downloadPDFWithProgress(setProgress) {
       
       pdf.restoreGraphicsState();
       
-      // Centered watermark
+      // Centered watermark with larger font
       pdf.setTextColor(240, 240, 240);
-      pdf.setFontSize(24);
+      pdf.setFontSize(32); // Increased
       pdf.text(watermark, centerX, centerY, {
         align: "center",
         angle: -45

@@ -16,26 +16,26 @@ const Header: React.FC = () => {
   ];
 
   return (
-    <header className="fixed w-full bg-white/30 backdrop-blur-xl border-b border-blue-200/40 shadow-lg z-50">
+    <header className="fixed w-full bg-gradient-to-r from-blue-600/95 to-blue-700/95 backdrop-blur-2xl border-b border-blue-400/30 shadow-2xl z-50">
       <div className="max-w-7xl mx-auto flex justify-between items-center p-4 md:p-6">
         {/* Logo */}
         <Link 
           href="/" 
-          className="text-2xl md:text-3xl font-extrabold text-blue-900 drop-shadow-lg tracking-wide"
+          className="text-2xl md:text-3xl font-extrabold text-white drop-shadow-2xl tracking-wide hover:scale-105 transition-transform duration-300"
         >
           Pixora
         </Link>
 
         {/* Desktop Menu */}
-        <nav className="hidden md:flex gap-6">
+        <nav className="hidden md:flex gap-4">
           {navItems.map((item) => (
             <Link
               key={item.path}
               href={item.path}
-              className={`font-semibold transition-all duration-300 px-5 py-2.5 rounded-2xl backdrop-blur-sm border ${
+              className={`font-semibold transition-all duration-300 px-6 py-3 rounded-xl border ${
                 pathname === item.path 
-                  ? "bg-white/40 text-blue-900 shadow-inner border-blue-300/50" 
-                  : "bg-white/30 text-blue-800 border-blue-200/40 hover:bg-white/40 hover:shadow-md hover:scale-105"
+                  ? "bg-white/20 text-white border-white/40 shadow-lg scale-105" 
+                  : "bg-white/10 text-white/90 border-white/20 hover:bg-white/20 hover:scale-105 hover:shadow-lg"
               }`}
             >
               {item.name}
@@ -48,37 +48,48 @@ const Header: React.FC = () => {
           className="md:hidden flex flex-col justify-center items-center w-12 h-12 gap-1.5 focus:outline-none group"
           onClick={() => setIsOpen(true)}
         >
-          <span className="block w-8 h-0.5 bg-blue-900 rounded-full transition-all duration-300 group-hover:bg-blue-700 group-hover:w-7"></span>
-          <span className="block w-8 h-0.5 bg-blue-900 rounded-full transition-all duration-300 group-hover:bg-blue-700 group-hover:w-7"></span>
-          <span className="block w-8 h-0.5 bg-blue-900 rounded-full transition-all duration-300 group-hover:bg-blue-700 group-hover:w-7"></span>
+          <span className="block w-8 h-0.5 bg-white rounded-full transition-all duration-300 group-hover:bg-blue-200"></span>
+          <span className="block w-8 h-0.5 bg-white rounded-full transition-all duration-300 group-hover:bg-blue-200"></span>
+          <span className="block w-8 h-0.5 bg-white rounded-full transition-all duration-300 group-hover:bg-blue-200"></span>
         </button>
       </div>
 
       {/* Mobile Side Menu */}
       <div
-        className={`fixed top-0 left-0 h-full w-80 bg-gradient-to-br from-white/40 via-blue-50/30 to-blue-100/20 backdrop-blur-2xl border-r border-blue-200/40 shadow-2xl p-6 flex flex-col gap-8 transform transition-all duration-500 z-50 ${
+        className={`fixed top-0 left-0 h-full w-80 bg-gradient-to-b from-blue-700 to-blue-600 backdrop-blur-2xl border-r border-blue-400/30 shadow-2xl p-6 flex flex-col gap-8 transform transition-all duration-500 z-50 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Close Button */}
-        <button
-          className="self-end w-10 h-10 relative focus:outline-none group rounded-2xl bg-white/40 backdrop-blur-sm border border-blue-200/50 hover:bg-white/50 transition-all duration-300 flex items-center justify-center"
-          onClick={() => setIsOpen(false)}
-        >
-          <span className="absolute w-6 h-0.5 bg-blue-900 rotate-45 rounded-full group-hover:bg-blue-700 transition-colors"></span>
-          <span className="absolute w-6 h-0.5 bg-blue-900 -rotate-45 rounded-full group-hover:bg-blue-700 transition-colors"></span>
-        </button>
+        {/* Header Section */}
+        <div className="flex justify-between items-center">
+          <Link 
+            href="/" 
+            className="text-2xl font-extrabold text-white drop-shadow-2xl tracking-wide"
+            onClick={() => setIsOpen(false)}
+          >
+            Pixora
+          </Link>
+          
+          {/* Close Button */}
+          <button
+            className="w-10 h-10 relative focus:outline-none group rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 transition-all duration-300 flex items-center justify-center"
+            onClick={() => setIsOpen(false)}
+          >
+            <span className="absolute w-6 h-0.5 bg-white rotate-45 rounded-full group-hover:bg-blue-200 transition-colors"></span>
+            <span className="absolute w-6 h-0.5 bg-white -rotate-45 rounded-full group-hover:bg-blue-200 transition-colors"></span>
+          </button>
+        </div>
 
         {/* Mobile Links */}
-        <nav className="flex flex-col gap-4 mt-8">
+        <nav className="flex flex-col gap-3 mt-8">
           {navItems.map((item, index) => (
             <Link
               key={item.path}
               href={item.path}
-              className={`font-semibold text-lg py-4 px-6 rounded-2xl transition-all duration-500 backdrop-blur-sm border ${
+              className={`font-semibold text-lg py-4 px-6 rounded-xl transition-all duration-300 border ${
                 pathname === item.path 
-                  ? "bg-white/50 text-blue-900 border-blue-300/50 shadow-lg scale-105" 
-                  : "bg-white/40 text-blue-800 border-blue-200/40 hover:bg-white/50 hover:scale-105 hover:shadow-md"
+                  ? "bg-white/20 text-white border-white/40 shadow-lg" 
+                  : "bg-white/10 text-white/90 border-white/20 hover:bg-white/20 hover:shadow-lg"
               }`}
               onClick={() => setIsOpen(false)}
               style={{ 
@@ -92,16 +103,14 @@ const Header: React.FC = () => {
           ))}
         </nav>
 
-        {/* Decorative Elements */}
-        <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-blue-200/30 to-transparent pointer-events-none"></div>
-        <div className="absolute top-1/4 -right-8 w-16 h-16 bg-white/30 rounded-full blur-xl"></div>
-        <div className="absolute bottom-1/3 -left-8 w-12 h-12 bg-blue-300/30 rounded-full blur-lg"></div>
+        {/* Bottom Decoration */}
+        <div className="absolute bottom-0 left-0 w-full h-20 bg-gradient-to-t from-blue-800/50 to-transparent pointer-events-none"></div>
       </div>
 
       {/* Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-blue-900/20 backdrop-blur-sm z-40 transition-all duration-500"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-all duration-500"
           onClick={() => setIsOpen(false)}
         ></div>
       )}

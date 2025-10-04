@@ -461,18 +461,20 @@ async function downloadPDF() {
     pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
     pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-    // Add professional watermark - lighter and better placement
+    // Add professional watermark - one big on each image + diagonal pattern on both sides
     if (watermark) {
-      // LARGE WATERMARK ON EACH CIVIL ID IMAGE (moved up slightly)
-      pdf.setFont("helvetica", "bold");
-      pdf.setTextColor(180, 180, 180); // Much lighter gray
-      pdf.setFontSize(36);
+      // Set watermark style - much lighter and more transparent
+      pdf.setFont("helvetica", "normal");
       
-      // Calculate positions for large watermarks on each Civil ID (moved up by 20)
+      // LARGE WATERMARK ON EACH CIVIL ID IMAGE (moved up and lighter)
+      pdf.setFontSize(32); // Slightly smaller for better fit
+      pdf.setTextColor(230, 230, 230, 0.4); // Very light gray with low opacity
+      
+      // Calculate positions for large watermarks on each Civil ID
       const frontCenterX = frontX + imgWidth / 2;
-      const frontCenterY = frontY + imgHeight / 2 - 20; // Moved up
+      const frontCenterY = frontY + imgHeight / 2 - 20; // Moved 20 points up
       const backCenterX = backX + imgWidth / 2;
-      const backCenterY = backY + imgHeight / 2 - 20; // Moved up
+      const backCenterY = backY + imgHeight / 2 - 20; // Moved 20 points up
       
       // Large watermark on front Civil ID
       pdf.text(watermark, frontCenterX, frontCenterY, {
@@ -486,51 +488,61 @@ async function downloadPDF() {
         angle: -45
       });
       
-      // SMALL WATERMARKS EVERYWHERE - FULL COVERAGE
-      pdf.setFontSize(16); // Smaller font for background pattern
-      pdf.setTextColor(200, 200, 200); // Very light gray for subtle watermark
+      // DIAGONAL PATTERN WATERMARK ACROSS ENTIRE PAGE ON BOTH SIDES
+      pdf.setFontSize(16); // Smaller font for diagonal pattern
+      pdf.setTextColor(240, 240, 240, 0.3); // Very light with low opacity
       
-      const patternSpacingX = 150;
-      const patternSpacingY = 120;
+      const diagonalSpacing = 150;
       
-      // Create grid pattern covering entire page
-      for (let x = -100; x < a4Width + 100; x += patternSpacingX) {
-        for (let y = -100; y < a4Height + 100; y += patternSpacingY) {
-          // Diagonal from top-left to bottom-right
-          pdf.text(watermark, x, y, {
-            align: "center",
-            angle: 45
-          });
-          
-          // Diagonal from top-right to bottom-left
-          pdf.text(watermark, x + patternSpacingX / 2, y + patternSpacingY / 2, {
-            align: "center",
-            angle: -45
-          });
-          
-          // Horizontal
-          pdf.text(watermark, x, y + patternSpacingY / 3, {
-            align: "center",
-            angle: 0
-          });
-          
-          // Vertical
-          pdf.text(watermark, x + patternSpacingX / 3, y, {
-            align: "center",
-            angle: 90
-          });
-        }
+      // DIAGONAL PATTERN FROM TOP-RIGHT TO BOTTOM-LEFT (Right side pattern)
+      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing) {
+        // Start from right side and go diagonal to bottom-left
+        const startX = a4Width + 100;
+        const startY = i;
+        
+        pdf.text(watermark, startX, startY, {
+          align: "right",
+          angle: -45
+        });
+        
+        // Additional line for better coverage
+        pdf.text(watermark, startX - 200, startY + diagonalSpacing / 2, {
+          align: "right",
+          angle: -45
+        });
       }
       
-      // Additional random placement for better coverage
-      for (let i = 0; i < 15; i++) {
-        const randomX = Math.random() * a4Width;
-        const randomY = Math.random() * a4Height;
-        const randomAngle = Math.random() * 360;
+      // DIAGONAL PATTERN FROM TOP-LEFT TO BOTTOM-RIGHT (Left side pattern)
+      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing) {
+        // Start from left side and go diagonal to bottom-right
+        const startX = -100;
+        const startY = i;
         
-        pdf.text(watermark, randomX, randomY, {
+        pdf.text(watermark, startX, startY, {
+          align: "left",
+          angle: 45 // Positive angle for left-to-right diagonal
+        });
+        
+        // Additional line for better coverage
+        pdf.text(watermark, startX + 200, startY + diagonalSpacing / 2, {
+          align: "left",
+          angle: 45
+        });
+      }
+      
+      // CENTER DIAGONAL PATTERN (in between)
+      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing * 1.5) {
+        // Center pattern - lighter and more sparse
+        pdf.setTextColor(245, 245, 245, 0.2); // Even lighter for center
+        
+        pdf.text(watermark, a4Width / 2, i, {
           align: "center",
-          angle: randomAngle
+          angle: -45
+        });
+        
+        pdf.text(watermark, a4Width / 2, i + diagonalSpacing, {
+          align: "center",
+          angle: 45
         });
       }
     }
@@ -581,17 +593,18 @@ async function downloadPDFWithProgress(setProgress) {
     pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
     pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-    // Professional watermark with better placement and lighter colors
+    // Professional watermark with improved placement and lighter colors
     if (watermark) {
-      // Large watermarks on each Civil ID (moved up)
-      pdf.setFont("helvetica", "bold");
-      pdf.setTextColor(180, 180, 180); // Lighter gray
-      pdf.setFontSize(36);
+      pdf.setFont("helvetica", "normal");
+      
+      // Large watermarks on each Civil ID (moved up and lighter)
+      pdf.setFontSize(32);
+      pdf.setTextColor(230, 230, 230, 0.4);
       
       const frontCenterX = frontX + imgWidth / 2;
-      const frontCenterY = frontY + imgHeight / 2 - 20; // Moved up
+      const frontCenterY = frontY + imgHeight / 2 - 20;
       const backCenterX = backX + imgWidth / 2;
-      const backCenterY = backY + imgHeight / 2 - 20; // Moved up
+      const backCenterY = backY + imgHeight / 2 - 20;
       
       // Large watermark on front Civil ID
       pdf.text(watermark, frontCenterX, frontCenterY, {
@@ -605,48 +618,56 @@ async function downloadPDFWithProgress(setProgress) {
         angle: -45
       });
       
-      // Small watermarks everywhere
+      // Diagonal pattern background on both sides
       pdf.setFontSize(16);
-      pdf.setTextColor(200, 200, 200); // Very light gray
+      pdf.setTextColor(240, 240, 240, 0.3);
       
-      const patternSpacingX = 150;
-      const patternSpacingY = 120;
+      const diagonalSpacing = 150;
       
-      // Full coverage grid pattern
-      for (let x = -100; x < a4Width + 100; x += patternSpacingX) {
-        for (let y = -100; y < a4Height + 100; y += patternSpacingY) {
-          // Multiple orientations for full coverage
-          pdf.text(watermark, x, y, {
-            align: "center",
-            angle: 45
-          });
-          
-          pdf.text(watermark, x + patternSpacingX / 2, y + patternSpacingY / 2, {
-            align: "center",
-            angle: -45
-          });
-          
-          pdf.text(watermark, x, y + patternSpacingY / 3, {
-            align: "center",
-            angle: 0
-          });
-          
-          pdf.text(watermark, x + patternSpacingX / 3, y, {
-            align: "center",
-            angle: 90
-          });
-        }
+      // Right side pattern (top-right to bottom-left)
+      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing) {
+        const startX = a4Width + 100;
+        const startY = i;
+        
+        pdf.text(watermark, startX, startY, {
+          align: "right",
+          angle: -45
+        });
+        
+        pdf.text(watermark, startX - 200, startY + diagonalSpacing / 2, {
+          align: "right",
+          angle: -45
+        });
       }
       
-      // Random placement for natural look
-      for (let i = 0; i < 15; i++) {
-        const randomX = Math.random() * a4Width;
-        const randomY = Math.random() * a4Height;
-        const randomAngle = Math.random() * 360;
+      // Left side pattern (top-left to bottom-right)
+      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing) {
+        const startX = -100;
+        const startY = i;
         
-        pdf.text(watermark, randomX, randomY, {
+        pdf.text(watermark, startX, startY, {
+          align: "left",
+          angle: 45
+        });
+        
+        pdf.text(watermark, startX + 200, startY + diagonalSpacing / 2, {
+          align: "left",
+          angle: 45
+        });
+      }
+      
+      // Center pattern (lighter and sparse)
+      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing * 1.5) {
+        pdf.setTextColor(245, 245, 245, 0.2);
+        
+        pdf.text(watermark, a4Width / 2, i, {
           align: "center",
-          angle: randomAngle
+          angle: -45
+        });
+        
+        pdf.text(watermark, a4Width / 2, i + diagonalSpacing, {
+          align: "center",
+          angle: 45
         });
       }
     }
@@ -659,6 +680,7 @@ async function downloadPDFWithProgress(setProgress) {
     if (setProgress) setProgress(0);
   }
 }
+
 
 
 useEffect(() => {

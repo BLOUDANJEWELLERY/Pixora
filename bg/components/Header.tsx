@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useState } from "react";
-import { HiMenu, HiX } from "react-icons/hi";
 
 const Header: React.FC = () => {
   const pathname = usePathname();
@@ -24,15 +23,16 @@ const Header: React.FC = () => {
       </h1>
 
       {/* Desktop Menu */}
-      <nav className="hidden md:flex gap-6">
+      <nav className="hidden md:flex gap-8">
         {navItems.map((item) => (
           <Link
             key={item.path}
             href={item.path}
-            className={`
-              text-blue-900 font-semibold hover:text-blue-700 transition-colors
-              ${pathname === item.path ? "underline decoration-2 underline-offset-4" : ""}
-            `}
+            className={`text-blue-900 font-semibold hover:text-blue-700 transition-colors ${
+              pathname === item.path
+                ? "underline decoration-2 underline-offset-4"
+                : ""
+            }`}
           >
             {item.name}
           </Link>
@@ -41,34 +41,40 @@ const Header: React.FC = () => {
 
       {/* Hamburger Button */}
       <button
-        className="md:hidden text-blue-900 text-3xl focus:outline-none"
+        className="md:hidden flex flex-col justify-center items-center w-10 h-10 gap-1.5"
         onClick={() => setIsOpen(true)}
       >
-        <HiMenu />
+        <span className="block w-8 h-0.5 bg-blue-900 rounded"></span>
+        <span className="block w-8 h-0.5 bg-blue-900 rounded"></span>
+        <span className="block w-8 h-0.5 bg-blue-900 rounded"></span>
       </button>
 
       {/* Mobile Slide-out Menu */}
       <div
-        className={`fixed top-0 left-0 h-full w-64 bg-white/90 backdrop-blur-xl shadow-2xl p-6 flex flex-col gap-6 transform transition-transform duration-300 z-50
-          ${isOpen ? "translate-x-0" : "-translate-x-full"}
-        `}
+        className={`fixed top-0 left-0 h-full w-64 bg-white/90 backdrop-blur-xl shadow-2xl p-6 flex flex-col gap-6 transform transition-transform duration-300 z-50 ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
+        {/* Close Button */}
         <button
-          className="self-end text-3xl text-blue-900 focus:outline-none"
+          className="self-end w-8 h-8 relative focus:outline-none"
           onClick={() => setIsOpen(false)}
         >
-          <HiX />
+          <span className="absolute w-8 h-0.5 bg-blue-900 rotate-45 top-1/2 left-0 -translate-y-1/2"></span>
+          <span className="absolute w-8 h-0.5 bg-blue-900 -rotate-45 top-1/2 left-0 -translate-y-1/2"></span>
         </button>
 
-        <nav className="flex flex-col gap-4 mt-4">
+        {/* Mobile Links */}
+        <nav className="flex flex-col gap-4 mt-6">
           {navItems.map((item) => (
             <Link
               key={item.path}
               href={item.path}
-              className={`
-                text-blue-900 font-semibold text-lg hover:text-blue-700 transition-colors
-                ${pathname === item.path ? "underline decoration-2 underline-offset-4" : ""}
-              `}
+              className={`text-blue-900 font-semibold text-lg hover:text-blue-700 transition-colors ${
+                pathname === item.path
+                  ? "underline decoration-2 underline-offset-4"
+                  : ""
+              }`}
               onClick={() => setIsOpen(false)}
             >
               {item.name}
@@ -77,7 +83,7 @@ const Header: React.FC = () => {
         </nav>
       </div>
 
-      {/* Overlay when menu is open */}
+      {/* Overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/30 z-40"

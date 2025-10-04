@@ -1,4 +1,4 @@
-"use client";
+{/*"use client";
 import jsPDF from "jspdf";
 import React, { useState, useRef, useEffect } from "react";
 
@@ -207,7 +207,7 @@ function FreeformCropper({ src, onCropChange }) {
         />
 
         {/* Polygon overlay - Made transparent */}
-        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none select-none">
+        {/*<svg className="absolute top-0 left-0 w-full h-full pointer-events-none select-none">
           <polygon
             points={corners.map((p) => `${p.x},${p.y}`).join(" ")}
             fill="none"
@@ -217,7 +217,7 @@ function FreeformCropper({ src, onCropChange }) {
         </svg>
 
         {/* Draggable handles */}
-        {corners.map((corner, idx) => (
+       {/* {corners.map((corner, idx) => (
           <div
             key={idx}
             onMouseDown={startDrag(idx)}
@@ -228,7 +228,7 @@ function FreeformCropper({ src, onCropChange }) {
         ))}
 
         {/* Magnifier */}
-        {draggingIndex !== null && imgRef.current && (
+        {/*{draggingIndex !== null && imgRef.current && (
           <div
             className="absolute border-2 border-blue-500 rounded-full overflow-hidden pointer-events-none bg-white select-none"
             style={{
@@ -250,7 +250,7 @@ function FreeformCropper({ src, onCropChange }) {
       </div>
 
       {/* Rotation Slider */}
-      <div className="flex justify-center mt-4 select-none">
+      {/*<div className="flex justify-center mt-4 select-none">
         <input
           type="range"
           min={-180}
@@ -633,4 +633,4 @@ useEffect(() => {
 )}
     </div>
   );
-}
+}*/}

@@ -2,6 +2,7 @@
 "use client";
 import Head from "next/head";
 import { useState, useRef, useEffect, useCallback } from "react";
+import Header from "../components/Header";
 
 type ExportFormat = "png" | "jpeg" | "jpg" | "webp";
 
@@ -189,6 +190,7 @@ export default function EdgeExtendBackground() {
 
   return (
 <>
+<Header />
       <Head>
         {/* Page title */}
         <title>Pixora | Background Extender</title>

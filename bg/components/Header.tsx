@@ -1,120 +1,131 @@
+// components/SidebarHeader.jsx
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import React, { useState } from "react";
+import { useState } from 'react';
+import Link from 'next/link';
 
-const Header: React.FC = () => {
-  const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(false);
+export default function SidebarHeader() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const navItems = [
-    { name: "Home", path: "/" },
-    { name: "Civil ID", path: "/civil-id" },
-    { name: "Back Extend", path: "/back-extend" },
-    { name: "Background Remover", path: "/background-remover" },
-  ];
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const closeSidebar = () => {
+    setIsSidebarOpen(false);
+  };
 
   return (
-    <header className="fixed w-full bg-white/80 backdrop-blur-xl border-b border-blue-200/50 shadow-lg z-50">
-      <div className="max-w-7xl mx-auto flex justify-between items-center p-4 md:p-6">
-        {/* Logo */}
-        <Link 
-          href="/" 
-          className="text-2xl md:text-3xl font-extrabold text-blue-900 drop-shadow-lg tracking-wide"
-        >
-          Pixora
-        </Link>
+    <>
+      {/* Header Bar */}
+      <header className="bg-white/80 backdrop-blur-md shadow-lg border-b border-blue-200 sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+          {/* Logo */}
+          <Link href="/" className="flex items-center space-x-2">
+            <span className="text-2xl font-bold text-blue-900">Pixora</span>
+          </Link>
 
-        {/* Desktop Menu */}
-        <nav className="hidden md:flex gap-6">
-          {navItems.map((item) => (
-            <Link
-              key={item.path}
-              href={item.path}
-              className={`font-semibold transition-all duration-300 px-5 py-2.5 rounded-xl backdrop-blur-sm border ${
-                pathname === item.path 
-                  ? "bg-blue-500/20 text-blue-900 border-blue-300 shadow-inner" 
-                  : "bg-white/60 text-blue-800 border-blue-200/60 hover:bg-white/80 hover:shadow-md"
-              }`}
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center space-x-8">
+            <Link 
+              href="/remove-bg" 
+              className="text-blue-900 hover:text-blue-700 font-medium transition-colors"
             >
-              {item.name}
+              Background Remover
             </Link>
-          ))}
-        </nav>
+            <Link 
+              href="/back-extend" 
+              className="text-blue-900 hover:text-blue-700 font-medium transition-colors"
+            >
+              Background Extender
+            </Link>
+            <Link 
+              href="/civil-id" 
+              className="text-blue-900 hover:text-blue-700 font-medium transition-colors"
+            >
+              Civil ID PDF Maker
+            </Link>
+          </nav>
 
-        {/* Hamburger Button */}
-        <button
-          className="md:hidden flex flex-col justify-center items-center w-12 h-12 gap-1.5 focus:outline-none group bg-white/60 backdrop-blur-sm rounded-xl border border-blue-200/50 hover:bg-white/80 transition-all duration-300"
-          onClick={() => setIsOpen(true)}
-        >
-          <span className="block w-6 h-0.5 bg-blue-900 rounded-full transition-all duration-300"></span>
-          <span className="block w-6 h-0.5 bg-blue-900 rounded-full transition-all duration-300"></span>
-          <span className="block w-6 h-0.5 bg-blue-900 rounded-full transition-all duration-300"></span>
-        </button>
-      </div>
-
-      {/* Mobile Side Menu - SOLID GLASS EFFECT */}
-      <div
-        className={`fixed top-0 left-0 h-full w-80 bg-gradient-to-br from-blue-500/95 via-blue-400/90 to-blue-600/95 backdrop-blur-2xl border-r border-blue-300/60 shadow-2xl p-6 flex flex-col gap-8 transform transition-all duration-300 z-50 ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        {/* Header Section */}
-        <div className="flex justify-between items-center border-b border-blue-300/40 pb-6">
-          <h2 className="text-2xl font-bold text-white drop-shadow-lg">Menu</h2>
-          {/* Close Button */}
+          {/* Mobile Menu Button */}
           <button
-            className="w-10 h-10 relative focus:outline-none group rounded-xl bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-300 flex items-center justify-center"
-            onClick={() => setIsOpen(false)}
+            onClick={toggleSidebar}
+            className="md:hidden p-2 rounded-lg text-blue-900 hover:bg-blue-100 transition-colors"
+            aria-label="Toggle menu"
           >
-            <span className="absolute w-5 h-0.5 bg-white rotate-45 rounded-full"></span>
-            <span className="absolute w-5 h-0.5 bg-white -rotate-45 rounded-full"></span>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isSidebarOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
           </button>
         </div>
+      </header>
 
-        {/* Mobile Links */}
-        <nav className="flex flex-col gap-3 mt-4">
-          {navItems.map((item, index) => (
-            <Link
-              key={item.path}
-              href={item.path}
-              className={`font-semibold text-lg py-4 px-6 rounded-xl transition-all duration-300 border-2 ${
-                pathname === item.path 
-                  ? "bg-white/30 text-white border-white/50 shadow-lg scale-[1.02] shadow-blue-500/30" 
-                  : "bg-white/10 text-white/90 border-white/20 hover:bg-white/20 hover:border-white/30 hover:scale-[1.02]"
-              }`}
-              onClick={() => setIsOpen(false)}
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          onClick={closeSidebar}
+        />
+      )}
+
+      {/* Mobile Sidebar */}
+      <div className={`
+        fixed top-0 left-0 h-full w-64 bg-white/95 backdrop-blur-md shadow-2xl 
+        transform transition-transform duration-300 ease-in-out z-50 md:hidden
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        {/* Sidebar Header */}
+        <div className="p-6 border-b border-blue-200">
+          <div className="flex items-center justify-between">
+            <span className="text-2xl font-bold text-blue-900">Pixora</span>
+            <button
+              onClick={closeSidebar}
+              className="p-1 rounded-lg text-blue-900 hover:bg-blue-100 transition-colors"
+              aria-label="Close menu"
             >
-              <div className="flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full ${pathname === item.path ? "bg-white" : "bg-white/60"}`}></div>
-                {item.name}
-              </div>
-            </Link>
-          ))}
-        </nav>
-
-        {/* Bottom Decoration */}
-        <div className="mt-auto pt-6 border-t border-blue-300/40">
-          <div className="text-white/70 text-sm text-center">
-            Pixora © {new Date().getFullYear()}
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
 
-        {/* Decorative Elements */}
-        <div className="absolute top-20 -right-10 w-20 h-20 bg-white/10 rounded-full blur-xl"></div>
-        <div className="absolute bottom-20 -left-10 w-16 h-16 bg-blue-300/20 rounded-full blur-lg"></div>
+        {/* Sidebar Navigation */}
+        <nav className="p-6 space-y-6">
+          <Link 
+            href="/remove-bg" 
+            className="block text-blue-900 hover:text-blue-700 font-medium text-lg transition-colors"
+            onClick={closeSidebar}
+          >
+            Background Remover
+          </Link>
+          <Link 
+            href="/back-extend" 
+            className="block text-blue-900 hover:text-blue-700 font-medium text-lg transition-colors"
+            onClick={closeSidebar}
+          >
+            Background Extender
+          </Link>
+          <Link 
+            href="/civil-id" 
+            className="block text-blue-900 hover:text-blue-700 font-medium text-lg transition-colors"
+            onClick={closeSidebar}
+          >
+            Civil ID PDF Maker
+          </Link>
+        </nav>
+
+        {/* Sidebar Footer */}
+        <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-blue-200">
+          <p className="text-blue-900 text-sm text-center">
+            Pixora © {new Date().getFullYear()}
+          </p>
+        </div>
       </div>
-
-      {/* Overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-all duration-300"
-          onClick={() => setIsOpen(false)}
-        ></div>
-      )}
-    </header>
+    </>
   );
-};
-
-export default Header;
+}

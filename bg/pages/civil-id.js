@@ -362,7 +362,7 @@ const [originalFrontPreview, setOriginalFrontPreview] = useState(null);
     setLoading(false);
   };
 
-function createRoundedImageElement(imgSrc: string, width: number, height: number, radius: number): Promise<string> {
+function createRoundedImageElement(imgSrc, width, height, radius) {
   return new Promise((resolve) => {
     const img = new Image();
     img.src = imgSrc;
@@ -472,7 +472,7 @@ async function downloadPDF() {
 }
 
 // Alternative version with progress tracking
-async function downloadPDFWithProgress(setProgress?: (progress: number) => void) {
+async function downloadPDFWithProgress(setProgress) {
   if (!frontPreview || !backPreview) return;
 
   const pdf = new jsPDF("p", "pt", "a4");

@@ -1,6 +1,7 @@
 "use client";
 import jsPDF from "jspdf";
 import React, { useState, useRef, useEffect } from "react";
+import Header from "../components/Header";
 
 function FreeformCropper({ src, onCropChange }) {
   const [corners, setCorners] = React.useState([]);
@@ -488,6 +489,8 @@ useEffect(() => {
 }, [editingImage]);
 
   return (
+    <>
+<Header />
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
       <h1 className="text-4xl font-bold text-blue-900 mb-8">Civil ID Processor</h1>
 
@@ -630,5 +633,6 @@ useEffect(() => {
   </div>
 )}
     </div>
+    </>
   );
 }

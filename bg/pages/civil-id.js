@@ -2,6 +2,7 @@
 import jsPDF from "jspdf";
 import React, { useState, useRef, useEffect } from "react";
 import Header from "../components/Header";
+import html2canvas from 'html2canvas';
 
 function FreeformCropper({ src, onCropChange }) {
   const [corners, setCorners] = React.useState([]);
@@ -361,43 +362,55 @@ const [originalFrontPreview, setOriginalFrontPreview] = useState(null);
     setLoading(false);
   };
 
-function drawRoundedImageToDataURL(img, width, height, radius) {
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return "";
-
-  ctx.clearRect(0, 0, width, height);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-
-  // Draw full rounded rectangle path
-  ctx.beginPath();
-  ctx.moveTo(radius, 0);
-  ctx.lineTo(width - radius, 0);
-  ctx.quadraticCurveTo(width, 0, width, radius);
-  ctx.lineTo(width, height - radius);
-  ctx.quadraticCurveTo(width, height, width - radius, height);
-  ctx.lineTo(radius, height);
-  ctx.quadraticCurveTo(0, height, 0, height - radius);
-  ctx.lineTo(0, radius);
-  ctx.quadraticCurveTo(0, 0, radius, 0);
-  ctx.closePath();
-  ctx.clip();
-
-  // Fit image inside the rounded rect without cropping
-  const scale = Math.min(width / img.naturalWidth, height / img.naturalHeight);
-  const drawW = img.naturalWidth * scale;
-  const drawH = img.naturalHeight * scale;
-  const offsetX = (width - drawW) / 2;
-  const offsetY = (height - drawH) / 2;
-
-  ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
-  return canvas.toDataURL("image/png");
+function createRoundedImageElement(imgSrc: string, width: number, height: number, radius: number): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = imgSrc;
+    
+    img.onload = () => {
+      // Create container div with rounded corners
+      const container = document.createElement('div');
+      container.style.width = `${width}px`;
+      container.style.height = `${height}px`;
+      container.style.borderRadius = `${radius}px`;
+      container.style.overflow = 'hidden';
+      container.style.display = 'flex';
+      container.style.alignItems = 'center';
+      container.style.justifyContent = 'center';
+      container.style.background = '#ffffff';
+      container.style.position = 'absolute';
+      container.style.left = '-9999px';
+      container.style.top = '-9999px';
+      
+      // Create image element with proper sizing
+      const imageElement = document.createElement('img');
+      imageElement.src = imgSrc;
+      imageElement.style.width = '100%';
+      imageElement.style.height = '100%';
+      imageElement.style.objectFit = 'contain';
+      imageElement.style.borderRadius = `${radius}px`;
+      
+      container.appendChild(imageElement);
+      document.body.appendChild(container);
+      
+      // Use html2canvas to capture the rounded image
+      html2canvas(container, {
+        scale: 2, // Higher scale for better quality
+        useCORS: true,
+        backgroundColor: null,
+        logging: false,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high',
+      }).then((canvas) => {
+        const dataUrl = canvas.toDataURL('image/png');
+        document.body.removeChild(container);
+        resolve(dataUrl);
+      });
+    };
+  });
 }
 
-function downloadPDF() {
+async function downloadPDF() {
   if (!frontPreview || !backPreview) return;
 
   const pdf = new jsPDF("p", "pt", "a4");
@@ -405,54 +418,125 @@ function downloadPDF() {
   const a4Height = 842;
   const margin = 40;
 
-  const frontImg = new Image();
-  const backImg = new Image();
-  frontImg.src = frontPreview;
-  backImg.src = backPreview;
+  const imgWidth = a4Width * 0.7;
+  const imgHeight = a4Height * 0.3;
+  const radius = 20; // Rounded corner radius
+  const spacing = 40;
 
-  frontImg.onload = () => {
-    backImg.onload = () => {
-      const spacing = 40; // space between images
-      const imgWidth = a4Width * 0.7; // smaller width
-      const imgHeight = a4Height * 0.3; // smaller height
-      const radius = 20; // rounded corner radius
+  try {
+    // Create rounded images using html2canvas
+    const [roundedFront, roundedBack] = await Promise.all([
+      createRoundedImageElement(frontPreview, imgWidth, imgHeight, radius),
+      createRoundedImageElement(backPreview, imgWidth, imgHeight, radius)
+    ]);
 
-      const frontX = (a4Width - imgWidth) / 2;
-      const frontY = margin;
-      const backX = frontX;
-      const backY = frontY + imgHeight + spacing;
+    // Calculate positions
+    const frontX = (a4Width - imgWidth) / 2;
+    const frontY = margin;
+    const backX = frontX;
+    const backY = frontY + imgHeight + spacing;
 
-      const roundedFront = drawRoundedImageToDataURL(frontImg, imgWidth, imgHeight, radius);
-      const roundedBack = drawRoundedImageToDataURL(backImg, imgWidth, imgHeight, radius);
+    // Set white background
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, a4Width, a4Height, "F");
 
-      pdf.setFillColor(255, 255, 255);
-      pdf.rect(0, 0, a4Width, a4Height, "F");
+    // Add rounded images to PDF
+    pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
+    pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-      pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
-      pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
+    // Add watermark if enabled
+    if (watermark) {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(60);
+      pdf.setTextColor(180, 180, 180);
+      pdf.setDrawColor(180, 180, 180);
+      pdf.setLineWidth(1.2);
 
-      if (watermark) {
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(60);
-        pdf.setTextColor(180, 180, 180);
-        pdf.setDrawColor(180, 180, 180);
-        pdf.setLineWidth(1.2);
-
-        const step = 250;
-        for (let y = -a4Height; y < a4Height * 2; y += step) {
-          pdf.line(0, y, a4Width, y + a4Width); // diagonal line
-          pdf.line(0, y + 30, a4Width, y + a4Width + 30); // parallel line
-        }
-
-        pdf.text(watermark, a4Width / 2, a4Height / 2, {
-          align: "center",
-          angle: -45,
-        });
+      const step = 250;
+      for (let y = -a4Height; y < a4Height * 2; y += step) {
+        pdf.line(0, y, a4Width, y + a4Width);
+        pdf.line(0, y + 30, a4Width, y + a4Width + 30);
       }
 
-      pdf.save("civil-id.pdf");
-    };
-  };
+      pdf.text(watermark, a4Width / 2, a4Height / 2, {
+        align: "center",
+        angle: -45,
+      });
+    }
+
+    pdf.save("civil-id.pdf");
+    
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+  }
+}
+
+// Alternative version with progress tracking
+async function downloadPDFWithProgress(setProgress?: (progress: number) => void) {
+  if (!frontPreview || !backPreview) return;
+
+  const pdf = new jsPDF("p", "pt", "a4");
+  const a4Width = 595;
+  const a4Height = 842;
+  const margin = 40;
+
+  const imgWidth = a4Width * 0.7;
+  const imgHeight = a4Height * 0.3;
+  const radius = 20;
+  const spacing = 40;
+
+  try {
+    if (setProgress) setProgress(10);
+
+    // Create rounded front image
+    const roundedFront = await createRoundedImageElement(frontPreview, imgWidth, imgHeight, radius);
+    if (setProgress) setProgress(50);
+
+    // Create rounded back image
+    const roundedBack = await createRoundedImageElement(backPreview, imgWidth, imgHeight, radius);
+    if (setProgress) setProgress(90);
+
+    // Calculate positions
+    const frontX = (a4Width - imgWidth) / 2;
+    const frontY = margin;
+    const backX = frontX;
+    const backY = frontY + imgHeight + spacing;
+
+    // Set white background
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, a4Width, a4Height, "F");
+
+    // Add images
+    pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
+    pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
+
+    // Watermark
+    if (watermark) {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(60);
+      pdf.setTextColor(180, 180, 180);
+      pdf.setDrawColor(180, 180, 180);
+      pdf.setLineWidth(1.2);
+
+      const step = 250;
+      for (let y = -a4Height; y < a4Height * 2; y += step) {
+        pdf.line(0, y, a4Width, y + a4Width);
+        pdf.line(0, y + 30, a4Width, y + a4Width + 30);
+      }
+
+      pdf.text(watermark, a4Width / 2, a4Height / 2, {
+        align: "center",
+        angle: -45,
+      });
+    }
+
+    if (setProgress) setProgress(100);
+    pdf.save("civil-id.pdf");
+    
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    if (setProgress) setProgress(0);
+  }
 }
 
 

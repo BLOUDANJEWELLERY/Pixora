@@ -1,17 +1,17 @@
 // components/SidebarHeader.tsx
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ReactElement } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 interface MenuItem {
   href: string;
   label: string;
-  icon: JSX.Element;
+  icon: ReactElement;
 }
 
-export default function SidebarHeader() {
+export default function SidebarHeader(): ReactElement {
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const pathname = usePathname();
 
@@ -123,6 +123,7 @@ export default function SidebarHeader() {
             onClick={toggleSidebar}
             className="md:hidden p-3 rounded-xl bg-white/50 backdrop-blur-sm text-blue-900 hover:bg-blue-100/80 transition-all duration-200 shadow-lg hover:shadow-xl border border-blue-200/30"
             aria-label="Toggle menu"
+            type="button"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {isSidebarOpen ? (
@@ -140,6 +141,12 @@ export default function SidebarHeader() {
         <div 
           className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 md:hidden"
           onClick={closeSidebar}
+          onKeyDown={(e: React.KeyboardEvent) => {
+            if (e.key === 'Escape') closeSidebar();
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label="Close sidebar"
         />
       )}
 
@@ -167,6 +174,7 @@ export default function SidebarHeader() {
               onClick={closeSidebar}
               className="p-2 rounded-lg text-blue-900 hover:bg-white/20 transition-all duration-200"
               aria-label="Close menu"
+              type="button"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

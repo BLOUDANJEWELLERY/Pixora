@@ -4,11 +4,9 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-<>
-<Header />
-
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
-      {/* Main Header */}
+      <Header />
+{/* Main Header */}
       <h1 className="text-5xl md:text-6xl font-extrabold text-blue-900 mb-12 text-center drop-shadow-lg tracking-wide animate-fadeIn">
         Welcome to <span className="text-blue-700">Pixora</span>
       </h1>
@@ -66,6 +64,5 @@ export default function Home() {
         }
       `}</style>
     </div>
-</>
   );
 }

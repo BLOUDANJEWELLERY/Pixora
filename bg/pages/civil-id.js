@@ -433,12 +433,12 @@ async function downloadPDF() {
   const pdf = new jsPDF("p", "pt", "a4");
   const a4Width = 595;
   const a4Height = 842;
-  const margin = 100; // Increased to 100
+  const margin = 100;
 
   const imgWidth = a4Width * 0.7;
   const imgHeight = a4Height * 0.25;
   const radius = 20;
-  const spacing = 100; // Increased to 100
+  const spacing = 100;
 
   try {
     // Create rounded images using html2canvas
@@ -449,7 +449,7 @@ async function downloadPDF() {
 
     // Calculate positions with increased spacing
     const frontX = (a4Width - imgWidth) / 2;
-    const frontY = margin + 60; // Increased to 60
+    const frontY = margin + 60;
     const backX = frontX;
     const backY = frontY + imgHeight + spacing;
 
@@ -461,20 +461,18 @@ async function downloadPDF() {
     pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
     pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-    // Add professional watermark - one big on each image + diagonal pattern
+    // Add professional watermark - lighter and better placement
     if (watermark) {
-      // Set watermark style
+      // LARGE WATERMARK ON EACH CIVIL ID IMAGE (moved up slightly)
       pdf.setFont("helvetica", "bold");
-      pdf.setTextColor(200, 200, 200, 0.6); // Light gray with transparency
+      pdf.setTextColor(180, 180, 180); // Much lighter gray
+      pdf.setFontSize(36);
       
-      // LARGE WATERMARK ON EACH CIVIL ID IMAGE
-      pdf.setFontSize(36); // Large font for Civil ID images
-      
-      // Calculate positions for large watermarks on each Civil ID
+      // Calculate positions for large watermarks on each Civil ID (moved up by 20)
       const frontCenterX = frontX + imgWidth / 2;
-      const frontCenterY = frontY + imgHeight / 2;
+      const frontCenterY = frontY + imgHeight / 2 - 20; // Moved up
       const backCenterX = backX + imgWidth / 2;
-      const backCenterY = backY + imgHeight / 2;
+      const backCenterY = backY + imgHeight / 2 - 20; // Moved up
       
       // Large watermark on front Civil ID
       pdf.text(watermark, frontCenterX, frontCenterY, {
@@ -488,38 +486,51 @@ async function downloadPDF() {
         angle: -45
       });
       
-      // DIAGONAL PATTERN WATERMARK ACROSS ENTIRE PAGE
-      pdf.setFontSize(18); // Smaller font for diagonal pattern
-      pdf.setTextColor(180, 180, 180, 0.4); // Even lighter for background pattern
+      // SMALL WATERMARKS EVERYWHERE - FULL COVERAGE
+      pdf.setFontSize(16); // Smaller font for background pattern
+      pdf.setTextColor(200, 200, 200); // Very light gray for subtle watermark
       
-      // Create diagonal lines of watermark text from top-right to bottom-left
-      const diagonalSpacing = 120;
-      const textWidth = pdf.getTextWidth(watermark);
+      const patternSpacingX = 150;
+      const patternSpacingY = 120;
       
-      // Draw multiple diagonal lines
-      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing) {
-        // Calculate starting point for this diagonal line (top-right moving to bottom-left)
-        const startX = a4Width + 50;
-        const startY = i;
-        
-        // Draw watermark along diagonal line
-        pdf.text(watermark, startX, startY, {
-          align: "right",
-          angle: -45 // Diagonal from top-right to bottom-left
-        });
-        
-        // Additional offset line for better coverage
-        pdf.text(watermark, startX - textWidth - 20, startY + diagonalSpacing / 2, {
-          align: "right",
-          angle: -45
-        });
+      // Create grid pattern covering entire page
+      for (let x = -100; x < a4Width + 100; x += patternSpacingX) {
+        for (let y = -100; y < a4Height + 100; y += patternSpacingY) {
+          // Diagonal from top-left to bottom-right
+          pdf.text(watermark, x, y, {
+            align: "center",
+            angle: 45
+          });
+          
+          // Diagonal from top-right to bottom-left
+          pdf.text(watermark, x + patternSpacingX / 2, y + patternSpacingY / 2, {
+            align: "center",
+            angle: -45
+          });
+          
+          // Horizontal
+          pdf.text(watermark, x, y + patternSpacingY / 3, {
+            align: "center",
+            angle: 0
+          });
+          
+          // Vertical
+          pdf.text(watermark, x + patternSpacingX / 3, y, {
+            align: "center",
+            angle: 90
+          });
+        }
       }
       
-      // Additional diagonal lines from the right side for better coverage
-      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing * 1.5) {
-        pdf.text(watermark, a4Width - 100, i, {
-          align: "right",
-          angle: -45
+      // Additional random placement for better coverage
+      for (let i = 0; i < 15; i++) {
+        const randomX = Math.random() * a4Width;
+        const randomY = Math.random() * a4Height;
+        const randomAngle = Math.random() * 360;
+        
+        pdf.text(watermark, randomX, randomY, {
+          align: "center",
+          angle: randomAngle
         });
       }
     }
@@ -570,18 +581,17 @@ async function downloadPDFWithProgress(setProgress) {
     pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
     pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-    // Professional watermark with Civil ID specific placement
+    // Professional watermark with better placement and lighter colors
     if (watermark) {
+      // Large watermarks on each Civil ID (moved up)
       pdf.setFont("helvetica", "bold");
-      pdf.setTextColor(200, 200, 200, 0.6);
-      
-      // Large watermarks on each Civil ID
+      pdf.setTextColor(180, 180, 180); // Lighter gray
       pdf.setFontSize(36);
       
       const frontCenterX = frontX + imgWidth / 2;
-      const frontCenterY = frontY + imgHeight / 2;
+      const frontCenterY = frontY + imgHeight / 2 - 20; // Moved up
       const backCenterX = backX + imgWidth / 2;
-      const backCenterY = backY + imgHeight / 2;
+      const backCenterY = backY + imgHeight / 2 - 20; // Moved up
       
       // Large watermark on front Civil ID
       pdf.text(watermark, frontCenterX, frontCenterY, {
@@ -595,33 +605,48 @@ async function downloadPDFWithProgress(setProgress) {
         angle: -45
       });
       
-      // Diagonal pattern background
-      pdf.setFontSize(18);
-      pdf.setTextColor(180, 180, 180, 0.4);
+      // Small watermarks everywhere
+      pdf.setFontSize(16);
+      pdf.setTextColor(200, 200, 200); // Very light gray
       
-      const diagonalSpacing = 120;
-      const textWidth = pdf.getTextWidth(watermark);
+      const patternSpacingX = 150;
+      const patternSpacingY = 120;
       
-      // Diagonal lines from top-right to bottom-left
-      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing) {
-        const startX = a4Width + 50;
-        const startY = i;
-        
-        pdf.text(watermark, startX, startY, {
-          align: "right",
-          angle: -45
-        });
-        
-        pdf.text(watermark, startX - textWidth - 20, startY + diagonalSpacing / 2, {
-          align: "right",
-          angle: -45
-        });
+      // Full coverage grid pattern
+      for (let x = -100; x < a4Width + 100; x += patternSpacingX) {
+        for (let y = -100; y < a4Height + 100; y += patternSpacingY) {
+          // Multiple orientations for full coverage
+          pdf.text(watermark, x, y, {
+            align: "center",
+            angle: 45
+          });
+          
+          pdf.text(watermark, x + patternSpacingX / 2, y + patternSpacingY / 2, {
+            align: "center",
+            angle: -45
+          });
+          
+          pdf.text(watermark, x, y + patternSpacingY / 3, {
+            align: "center",
+            angle: 0
+          });
+          
+          pdf.text(watermark, x + patternSpacingX / 3, y, {
+            align: "center",
+            angle: 90
+          });
+        }
       }
       
-      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing * 1.5) {
-        pdf.text(watermark, a4Width - 100, i, {
-          align: "right",
-          angle: -45
+      // Random placement for natural look
+      for (let i = 0; i < 15; i++) {
+        const randomX = Math.random() * a4Width;
+        const randomY = Math.random() * a4Height;
+        const randomAngle = Math.random() * 360;
+        
+        pdf.text(watermark, randomX, randomY, {
+          align: "center",
+          angle: randomAngle
         });
       }
     }

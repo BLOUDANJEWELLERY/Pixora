@@ -433,12 +433,12 @@ async function downloadPDF() {
   const pdf = new jsPDF("p", "pt", "a4");
   const a4Width = 595;
   const a4Height = 842;
-  const margin = 80; // Increased top margin
+  const margin = 100; // Increased top margin
 
   const imgWidth = a4Width * 0.7;
   const imgHeight = a4Height * 0.25;
   const radius = 20;
-  const spacing = 80; // Increased spacing between images
+  const spacing = 100; // Increased spacing between images
 
   try {
     // Create rounded images using html2canvas
@@ -449,7 +449,7 @@ async function downloadPDF() {
 
     // Calculate positions - moved downward with more spacing
     const frontX = (a4Width - imgWidth) / 2;
-    const frontY = margin + 40; // Additional downward offset
+    const frontY = margin + 60; // Additional downward offset
     const backX = frontX;
     const backY = frontY + imgHeight + spacing;
 

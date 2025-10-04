@@ -16,42 +16,42 @@ const Header: React.FC = () => {
   ];
 
   return (
-    <header className="w-full bg-white/40 backdrop-blur-md shadow-2xl rounded-b-3xl p-4 flex justify-between items-center relative z-50">
-      {/* Logo */}
-      <h1 className="text-2xl md:text-3xl font-extrabold text-blue-900 drop-shadow-md">
-        <Link href="/">Pixora</Link>
-      </h1>
+    <header className="fixed w-full bg-white/50 backdrop-blur-md shadow-md z-50">
+      <div className="max-w-7xl mx-auto flex justify-between items-center p-4 md:p-6">
+        {/* Logo */}
+        <Link href="/" className="text-2xl md:text-3xl font-extrabold text-blue-900 drop-shadow-md">
+          Pixora
+        </Link>
 
-      {/* Desktop Menu */}
-      <nav className="hidden md:flex gap-8">
-        {navItems.map((item) => (
-          <Link
-            key={item.path}
-            href={item.path}
-            className={`text-blue-900 font-semibold hover:text-blue-700 transition-colors ${
-              pathname === item.path
-                ? "underline decoration-2 underline-offset-4"
-                : ""
-            }`}
-          >
-            {item.name}
-          </Link>
-        ))}
-      </nav>
+        {/* Desktop Menu */}
+        <nav className="hidden md:flex gap-8">
+          {navItems.map((item) => (
+            <Link
+              key={item.path}
+              href={item.path}
+              className={`text-blue-900 font-semibold hover:text-blue-700 transition-colors ${
+                pathname === item.path ? "underline decoration-2 underline-offset-4" : ""
+              }`}
+            >
+              {item.name}
+            </Link>
+          ))}
+        </nav>
 
-      {/* Hamburger Button */}
-      <button
-        className="md:hidden flex flex-col justify-center items-center w-10 h-10 gap-1.5"
-        onClick={() => setIsOpen(true)}
-      >
-        <span className="block w-8 h-0.5 bg-blue-900 rounded"></span>
-        <span className="block w-8 h-0.5 bg-blue-900 rounded"></span>
-        <span className="block w-8 h-0.5 bg-blue-900 rounded"></span>
-      </button>
+        {/* Hamburger Button */}
+        <button
+          className="md:hidden flex flex-col justify-center items-center w-10 h-10 gap-1.5 focus:outline-none"
+          onClick={() => setIsOpen(true)}
+        >
+          <span className="block w-8 h-0.5 bg-blue-900 rounded"></span>
+          <span className="block w-8 h-0.5 bg-blue-900 rounded"></span>
+          <span className="block w-8 h-0.5 bg-blue-900 rounded"></span>
+        </button>
+      </div>
 
-      {/* Mobile Slide-out Menu */}
+      {/* Mobile Side Menu */}
       <div
-        className={`fixed top-0 left-0 h-full w-64 bg-white/90 backdrop-blur-xl shadow-2xl p-6 flex flex-col gap-6 transform transition-transform duration-300 z-50 ${
+        className={`fixed top-0 left-0 h-full w-64 bg-white/90 backdrop-blur-xl shadow-2xl p-6 flex flex-col gap-8 transform transition-transform duration-300 z-50 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -65,17 +65,16 @@ const Header: React.FC = () => {
         </button>
 
         {/* Mobile Links */}
-        <nav className="flex flex-col gap-4 mt-6">
-          {navItems.map((item) => (
+        <nav className="flex flex-col gap-6 mt-8">
+          {navItems.map((item, index) => (
             <Link
               key={item.path}
               href={item.path}
               className={`text-blue-900 font-semibold text-lg hover:text-blue-700 transition-colors ${
-                pathname === item.path
-                  ? "underline decoration-2 underline-offset-4"
-                  : ""
+                pathname === item.path ? "underline decoration-2 underline-offset-4" : ""
               }`}
               onClick={() => setIsOpen(false)}
+              style={{ transitionDelay: `${index * 0.05}s` }}
             >
               {item.name}
             </Link>
@@ -86,7 +85,7 @@ const Header: React.FC = () => {
       {/* Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/30 z-40"
+          className="fixed inset-0 bg-black/30 z-40 backdrop-blur-sm transition-opacity"
           onClick={() => setIsOpen(false)}
         ></div>
       )}

@@ -466,9 +466,9 @@ async function downloadPDF() {
       pdf.setFont("helvetica", "normal");
       
       // Create graphics state for transparency
-      const lightTransparency = pdf.GState({opacity: 0.15});
-      const mediumTransparency = pdf.GState({opacity: 0.08});
-      const heavyTransparency = pdf.GState({opacity: 0.05});
+      const lightTransparency = pdf.GState({opacity: 0.4});
+      const mediumTransparency = pdf.GState({opacity: 0.4});
+      const heavyTransparency = pdf.GState({opacity: 0.4});
       
       // === LARGE CENTRAL WATERMARKS ON EACH CIVIL ID ===
       pdf.setFontSize(36);

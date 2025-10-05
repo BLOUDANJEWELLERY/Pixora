@@ -412,7 +412,7 @@ function createRoundedImageElement(imgSrc, targetWidth, targetHeight, radius) {
       
       // Use html2canvas to capture the rounded image
       html2canvas(container, {
-        scale: 2,
+        scale: 4,
         useCORS: true,
         backgroundColor: null,
         logging: false,

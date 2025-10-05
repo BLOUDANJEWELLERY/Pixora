@@ -362,7 +362,7 @@ const [originalFrontPreview, setOriginalFrontPreview] = useState(null);
     setLoading(false);
   };
 
-Still it is showing black watermarks here is the complete pdf creation function:          function createRoundedImageElement(imgSrc, targetWidth, targetHeight, radius) {
+function createRoundedImageElement(imgSrc, targetWidth, targetHeight, radius) {
   return new Promise((resolve) => {
     const img = new Image();
     img.src = imgSrc;
@@ -461,96 +461,6 @@ async function downloadPDF() {
     pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
     pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-    // Add professional watermark - one big on each image + diagonal pattern on both sides
-    // PROFESSIONAL WATERMARK STYLE
-if (watermark) {
-  pdf.setFont("helvetica", "bold");
-
-  // === LARGE CENTRAL WATERMARKS ON EACH CIVIL ID ===
-  pdf.setFontSize(36);
-  pdf.setTextColor(180, 180, 180, 0.15); // Subtle but visible
-
-  const frontCenterX = frontX + imgWidth / 2;
-  const frontCenterY = frontY + imgHeight / 2;
-  const backCenterX = backX + imgWidth / 2;
-  const backCenterY = backY + imgHeight / 2;
-
-  pdf.text(watermark, frontCenterX, frontCenterY, {
-    align: "center",
-    angle: -30,
-  });
-
-  pdf.text(watermark, backCenterX, backCenterY, {
-    align: "center",
-    angle: -30,
-  });
-
-  // === LIGHT DIAGONAL BACKGROUND PATTERN ===
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(18);
-  pdf.setTextColor(220, 220, 220, 0.07); // Very faint background layer
-
-  const diagonalSpacingX = 160; // horizontal gap between watermarks
-  const diagonalSpacingY = 140; // vertical gap between watermarks
-  const angle = -30;
-
-  for (let y = -a4Height / 2; y < a4Height * 1.5; y += diagonalSpacingY) {
-    for (let x = -a4Width / 2; x < a4Width * 1.5; x += diagonalSpacingX) {
-      pdf.text(watermark, x, y, {
-        angle,
-      });
-    }
-  }
-}
-    
-    
-    pdf.save("civil-id.pdf");
-    
-  } catch (error) {
-    console.error('Error generating PDF:', error);
-  }
-}
-
-// Alternative version with progress tracking
-async function downloadPDFWithProgress(setProgress) {
-  if (!frontPreview || !backPreview) return;
-
-  const pdf = new jsPDF("p", "pt", "a4");
-  const a4Width = 595;
-  const a4Height = 842;
-  const margin = 100;
-
-  const imgWidth = a4Width * 0.7;
-  const imgHeight = a4Height * 0.25;
-  const radius = 20;
-  const spacing = 100;
-
-  try {
-    if (setProgress) setProgress(10);
-
-    // Create rounded front image
-    const roundedFront = await createRoundedImageElement(frontPreview, imgWidth, imgHeight, radius);
-    if (setProgress) setProgress(50);
-
-    // Create rounded back image
-    const roundedBack = await createRoundedImageElement(backPreview, imgWidth, imgHeight, radius);
-    if (setProgress) setProgress(90);
-
-    // Calculate positions with increased spacing
-    const frontX = (a4Width - imgWidth) / 2;
-    const frontY = margin + 60;
-    const backX = frontX;
-    const backY = frontY + imgHeight + spacing;
-
-    // Set white background
-    pdf.setFillColor(255, 255, 255);
-    pdf.rect(0, 0, a4Width, a4Height, "F");
-
-    // Add images
-    pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
-    pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
-
-
     // PROFESSIONAL WATERMARK WITH PROPER TRANSPARENCY
     if (watermark) {
       pdf.setFont("helvetica", "normal");
@@ -602,17 +512,14 @@ async function downloadPDFWithProgress(setProgress) {
       // Reset graphics state to normal
       pdf.setGState(pdf.GState({opacity: 1}));
     }
-
-    if (setProgress) setProgress(100);
+    
+    
     pdf.save("civil-id.pdf");
     
   } catch (error) {
     console.error('Error generating PDF:', error);
-    if (setProgress) setProgress(0);
   }
 }
-
-
 
 useEffect(() => {
   if (editingImage) {

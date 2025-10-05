@@ -462,91 +462,48 @@ async function downloadPDF() {
     pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
     // Add professional watermark - one big on each image + diagonal pattern on both sides
-    if (watermark) {
-      // Set watermark style - much lighter and more transparent
-      pdf.setFont("helvetica", "normal");
-      
-      // LARGE WATERMARK ON EACH CIVIL ID IMAGE (moved up and lighter)
-      pdf.setFontSize(32); // Slightly smaller for better fit
-      pdf.setTextColor(230, 230, 230, 0.4); // Very light gray with low opacity
-      
-      // Calculate positions for large watermarks on each Civil ID
-      const frontCenterX = frontX + imgWidth / 2;
-      const frontCenterY = frontY + imgHeight / 2 - 20; // Moved 20 points up
-      const backCenterX = backX + imgWidth / 2;
-      const backCenterY = backY + imgHeight / 2 - 20; // Moved 20 points up
-      
-      // Large watermark on front Civil ID
-      pdf.text(watermark, frontCenterX, frontCenterY, {
-        align: "center",
-        angle: -45
-      });
-      
-      // Large watermark on back Civil ID
-      pdf.text(watermark, backCenterX, backCenterY, {
-        align: "center",
-        angle: -45
-      });
-      
-      // DIAGONAL PATTERN WATERMARK ACROSS ENTIRE PAGE ON BOTH SIDES
-      pdf.setFontSize(16); // Smaller font for diagonal pattern
-      pdf.setTextColor(240, 240, 240, 0.3); // Very light with low opacity
-      
-      const diagonalSpacing = 150;
-      
-      // DIAGONAL PATTERN FROM TOP-RIGHT TO BOTTOM-LEFT (Right side pattern)
-      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing) {
-        // Start from right side and go diagonal to bottom-left
-        const startX = a4Width + 100;
-        const startY = i;
-        
-        pdf.text(watermark, startX, startY, {
-          align: "right",
-          angle: -45
-        });
-        
-        // Additional line for better coverage
-        pdf.text(watermark, startX - 200, startY + diagonalSpacing / 2, {
-          align: "right",
-          angle: -45
-        });
-      }
-      
-      // DIAGONAL PATTERN FROM TOP-LEFT TO BOTTOM-RIGHT (Left side pattern)
-      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing) {
-        // Start from left side and go diagonal to bottom-right
-        const startX = -100;
-        const startY = i;
-        
-        pdf.text(watermark, startX, startY, {
-          align: "left",
-          angle: 45 // Positive angle for left-to-right diagonal
-        });
-        
-        // Additional line for better coverage
-        pdf.text(watermark, startX + 200, startY + diagonalSpacing / 2, {
-          align: "left",
-          angle: 45
-        });
-      }
-      
-      // CENTER DIAGONAL PATTERN (in between)
-      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing * 1.5) {
-        // Center pattern - lighter and more sparse
-        pdf.setTextColor(245, 245, 245, 0.2); // Even lighter for center
-        
-        pdf.text(watermark, a4Width / 2, i, {
-          align: "center",
-          angle: -45
-        });
-        
-        pdf.text(watermark, a4Width / 2, i + diagonalSpacing, {
-          align: "center",
-          angle: 45
-        });
-      }
-    }
+    // PROFESSIONAL WATERMARK STYLE
+if (watermark) {
+  pdf.setFont("helvetica", "bold");
 
+  // === LARGE CENTRAL WATERMARKS ON EACH CIVIL ID ===
+  pdf.setFontSize(36);
+  pdf.setTextColor(180, 180, 180, 0.15); // Subtle but visible
+
+  const frontCenterX = frontX + imgWidth / 2;
+  const frontCenterY = frontY + imgHeight / 2;
+  const backCenterX = backX + imgWidth / 2;
+  const backCenterY = backY + imgHeight / 2;
+
+  pdf.text(watermark, frontCenterX, frontCenterY, {
+    align: "center",
+    angle: -30,
+  });
+
+  pdf.text(watermark, backCenterX, backCenterY, {
+    align: "center",
+    angle: -30,
+  });
+
+  // === LIGHT DIAGONAL BACKGROUND PATTERN ===
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(18);
+  pdf.setTextColor(220, 220, 220, 0.07); // Very faint background layer
+
+  const diagonalSpacingX = 160; // horizontal gap between watermarks
+  const diagonalSpacingY = 140; // vertical gap between watermarks
+  const angle = -30;
+
+  for (let y = -a4Height / 2; y < a4Height * 1.5; y += diagonalSpacingY) {
+    for (let x = -a4Width / 2; x < a4Width * 1.5; x += diagonalSpacingX) {
+      pdf.text(watermark, x, y, {
+        angle,
+      });
+    }
+  }
+}
+    
+    
     pdf.save("civil-id.pdf");
     
   } catch (error) {

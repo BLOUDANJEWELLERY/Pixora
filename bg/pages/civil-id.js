@@ -472,7 +472,7 @@ async function downloadPDF() {
       
       // === LARGE CENTRAL WATERMARKS ON EACH CIVIL ID ===
       pdf.setFontSize(36);
-      pdf.setTextColor(200, 200, 200); // Light gray
+      pdf.setTextColor(10, 100, 100); // Light gray
       
       const frontCenterX = frontX + imgWidth / 2;
       const frontCenterY = frontY + imgHeight / 2;

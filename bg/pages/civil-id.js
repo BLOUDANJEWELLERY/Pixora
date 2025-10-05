@@ -556,7 +556,7 @@ async function downloadPDFWithProgress(setProgress) {
       
       // Large watermarks on each Civil ID (moved up and lighter)
       pdf.setFontSize(32);
-      pdf.setTextColor(230, 230, 230, 0.4);
+      pdf.setTextColor(250, 250, 250);
       
       const frontCenterX = frontX + imgWidth / 2;
       const frontCenterY = frontY + imgHeight / 2 - 20;

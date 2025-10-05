@@ -3,6 +3,7 @@ import jsPDF from "jspdf";
 import React, { useState, useRef, useEffect } from "react";
 import Header from "../components/Header";
 import html2canvas from 'html2canvas';
+import civilIdServerKeepAlive from '../components/serverKeepAlive';
 
 function FreeformCropper({ src, onCropChange }) {
   const [corners, setCorners] = React.useState([]);
@@ -272,9 +273,21 @@ function FreeformCropper({ src, onCropChange }) {
     </div>
   );
 }
-
 // Main Civil ID Page
 export default function CivilIdPage() {
+
+
+
+  useEffect(() => {
+    // Start keeping server alive when component mounts
+    civilIdServerKeepAlive.start();
+
+    // Stop when component unmounts (optional)
+    return () => civilIdServerKeepAlive.stop();
+  }, []);
+
+
+
 const [editingImage, setEditingImage] = useState(null); // "front" | "back" | null
 
 const openCropper = (type) => {

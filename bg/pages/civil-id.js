@@ -466,7 +466,7 @@ async function downloadPDF() {
       pdf.setFont("helvetica", "normal");
       
       // Create graphics state for transparency
-      const lightTransparency = pdf.GState({opacity: 0.6});
+      const lightTransparency = pdf.GState({opacity: 0.8});
       const mediumTransparency = pdf.GState({opacity: 0.6});
       const heavyTransparency = pdf.GState({opacity: 0.6});
       
@@ -475,9 +475,9 @@ async function downloadPDF() {
       pdf.setTextColor(100, 100, 100); // Light gray
       
       const frontCenterX = frontX + imgWidth / 2;
-      const frontCenterY = frontY + imgHeight / 2;
+      const frontCenterY = frontY - 20 + imgHeight / 2;
       const backCenterX = backX + imgWidth / 2;
-      const backCenterY = backY + imgHeight / 2;
+      const backCenterY = backY - 20 + imgHeight / 2;
       
       // Apply transparency and draw large watermarks
       pdf.setGState(lightTransparency);

@@ -362,71 +362,6 @@ const [originalFrontPreview, setOriginalFrontPreview] = useState(null);
     setLoading(false);
   };
 
-function createRoundedImageElement(imgSrc, targetWidth, targetHeight, radius) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.src = imgSrc;
-    
-    img.onload = () => {
-      // Calculate aspect ratio of the original image
-      const imgAspectRatio = img.naturalWidth / img.naturalHeight;
-      const containerAspectRatio = targetWidth / targetHeight;
-      
-      let finalWidth, finalHeight;
-      
-      // Determine best fit without stretching
-      if (imgAspectRatio > containerAspectRatio) {
-        // Image is wider than container
-        finalWidth = targetWidth;
-        finalHeight = targetWidth / imgAspectRatio;
-      } else {
-        // Image is taller than container
-        finalHeight = targetHeight;
-        finalWidth = targetHeight * imgAspectRatio;
-      }
-      
-      // Create container div with rounded corners
-      const container = document.createElement('div');
-      container.style.width = `${targetWidth}px`;
-      container.style.height = `${targetHeight}px`;
-      container.style.borderRadius = `${radius}px`;
-      container.style.overflow = 'hidden';
-      container.style.display = 'flex';
-      container.style.alignItems = 'center';
-      container.style.justifyContent = 'center';
-      container.style.background = '#ffffff';
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      container.style.top = '-9999px';
-      
-      // Create image element with proper aspect ratio
-      const imageElement = document.createElement('img');
-      imageElement.src = imgSrc;
-      imageElement.style.width = `${finalWidth}px`;
-      imageElement.style.height = `${finalHeight}px`;
-      imageElement.style.objectFit = 'cover';
-      imageElement.style.borderRadius = `${radius}px`;
-      
-      container.appendChild(imageElement);
-      document.body.appendChild(container);
-      
-      // Use html2canvas to capture the rounded image
-      html2canvas(container, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: null,
-        logging: false,
-        imageSmoothingEnabled: true,
-        imageSmoothingQuality: 'high',
-      }).then((canvas) => {
-        const dataUrl = canvas.toDataURL('image/png');
-        document.body.removeChild(container);
-        resolve(dataUrl);
-      });
-    };
-  });
-}
-
 async function downloadPDF() {
   if (!frontPreview || !backPreview) return;
 
@@ -461,48 +396,57 @@ async function downloadPDF() {
     pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
     pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-    // Add professional watermark - one big on each image + diagonal pattern on both sides
-    // PROFESSIONAL WATERMARK STYLE
-if (watermark) {
-  pdf.setFont("helvetica", "bold");
-
-  // === LARGE CENTRAL WATERMARKS ON EACH CIVIL ID ===
-  pdf.setFontSize(36);
-  pdf.setTextColor(180, 180, 180, 0.15); // Subtle but visible
-
-  const frontCenterX = frontX + imgWidth / 2;
-  const frontCenterY = frontY + imgHeight / 2;
-  const backCenterX = backX + imgWidth / 2;
-  const backCenterY = backY + imgHeight / 2;
-
-  pdf.text(watermark, frontCenterX, frontCenterY, {
-    align: "center",
-    angle: -30,
-  });
-
-  pdf.text(watermark, backCenterX, backCenterY, {
-    align: "center",
-    angle: -30,
-  });
-
-  // === LIGHT DIAGONAL BACKGROUND PATTERN ===
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(18);
-  pdf.setTextColor(220, 220, 220, 0.07); // Very faint background layer
-
-  const diagonalSpacingX = 160; // horizontal gap between watermarks
-  const diagonalSpacingY = 140; // vertical gap between watermarks
-  const angle = -30;
-
-  for (let y = -a4Height / 2; y < a4Height * 1.5; y += diagonalSpacingY) {
-    for (let x = -a4Width / 2; x < a4Width * 1.5; x += diagonalSpacingX) {
-      pdf.text(watermark, x, y, {
-        angle,
+    // PROFESSIONAL WATERMARK WITH PROPER TRANSPARENCY
+    if (watermark) {
+      pdf.setFont("helvetica", "normal");
+      
+      // Create graphics state for transparency
+      const lightTransparency = pdf.GState({opacity: 0.15});
+      const mediumTransparency = pdf.GState({opacity: 0.08});
+      const heavyTransparency = pdf.GState({opacity: 0.05});
+      
+      // === LARGE CENTRAL WATERMARKS ON EACH CIVIL ID ===
+      pdf.setFontSize(36);
+      pdf.setTextColor(180, 180, 180); // Light gray
+      
+      const frontCenterX = frontX + imgWidth / 2;
+      const frontCenterY = frontY + imgHeight / 2;
+      const backCenterX = backX + imgWidth / 2;
+      const backCenterY = backY + imgHeight / 2;
+      
+      // Apply transparency and draw large watermarks
+      pdf.setGState(lightTransparency);
+      pdf.text(watermark, frontCenterX, frontCenterY, {
+        align: "center",
+        angle: -30,
       });
+      
+      pdf.text(watermark, backCenterX, backCenterY, {
+        align: "center",
+        angle: -30,
+      });
+      
+      // === LIGHT DIAGONAL BACKGROUND PATTERN ===
+      pdf.setFontSize(18);
+      pdf.setTextColor(200, 200, 200); // Lighter gray
+      
+      const diagonalSpacingX = 160;
+      const diagonalSpacingY = 140;
+      const angle = -30;
+      
+      // Apply more transparency for background pattern
+      pdf.setGState(mediumTransparency);
+      for (let y = -a4Height / 2; y < a4Height * 1.5; y += diagonalSpacingY) {
+        for (let x = -a4Width / 2; x < a4Width * 1.5; x += diagonalSpacingX) {
+          pdf.text(watermark, x, y, {
+            angle,
+          });
+        }
+      }
+      
+      // Reset graphics state to normal
+      pdf.setGState(pdf.GState({opacity: 1}));
     }
-  }
-}
-    
     
     pdf.save("civil-id.pdf");
     
@@ -550,92 +494,57 @@ async function downloadPDFWithProgress(setProgress) {
     pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
     pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-// Professional watermark with improved placement and transparency
-if (watermark) {
-  pdf.setFont("helvetica", "normal");
-  
-  // Create graphics state for transparency
-  const transparentState = pdf.GState({opacity: 0.1});
-  const moreTransparentState = pdf.GState({opacity: 0.05});
-  
-  // Large watermarks on each Civil ID (moved up and transparent)
-  pdf.setFontSize(32);
-  pdf.setTextColor(200, 200, 200); // Light gray color
-  
-  const frontCenterX = frontX + imgWidth / 2;
-  const frontCenterY = frontY + imgHeight / 2 - 20;
-  const backCenterX = backX + imgWidth / 2;
-  const backCenterY = backY + imgHeight / 2 - 20;
-  
-  // Large watermark on front Civil ID with transparency
-  pdf.setGState(transparentState);
-  pdf.text(watermark, frontCenterX, frontCenterY, {
-    align: "center",
-    angle: -45
-  });
-  
-  // Large watermark on back Civil ID with transparency
-  pdf.text(watermark, backCenterX, backCenterY, {
-    align: "center",
-    angle: -45
-  });
-  
-  // Diagonal pattern background on both sides - even more transparent
-  pdf.setFontSize(16);
-  pdf.setTextColor(220, 220, 220); // Very light gray
-  
-  const diagonalSpacing = 150;
-  
-  // Right side pattern (top-right to bottom-left)
-  pdf.setGState(moreTransparentState);
-  for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing) {
-    const startX = a4Width + 100;
-    const startY = i;
-    
-    pdf.text(watermark, startX, startY, {
-      align: "right",
-      angle: -45
-    });
-    
-    pdf.text(watermark, startX - 200, startY + diagonalSpacing / 2, {
-      align: "right",
-      angle: -45
-    });
-  }
-  
-  // Left side pattern (top-left to bottom-right)
-  for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing) {
-    const startX = -100;
-    const startY = i;
-    
-    pdf.text(watermark, startX, startY, {
-      align: "left",
-      angle: 45
-    });
-    
-    pdf.text(watermark, startX + 200, startY + diagonalSpacing / 2, {
-      align: "left",
-      angle: 45
-    });
-  }
-  
-  // Center pattern (lightest and most sparse)
-  pdf.setTextColor(230, 230, 230); // Lightest gray
-  for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing * 1.5) {
-    pdf.text(watermark, a4Width / 2, i, {
-      align: "center",
-      angle: -45
-    });
-    
-    pdf.text(watermark, a4Width / 2, i + diagonalSpacing, {
-      align: "center",
-      angle: 45
-    });
-  }
-  
-  // Reset graphics state to normal
-  pdf.setGState(pdf.GState({opacity: 1}));
-}
+    // PROFESSIONAL WATERMARK WITH PROPER TRANSPARENCY
+    if (watermark) {
+      pdf.setFont("helvetica", "normal");
+      
+      // Create graphics state for transparency
+      const lightTransparency = pdf.GState({opacity: 0.15});
+      const mediumTransparency = pdf.GState({opacity: 0.08});
+      const heavyTransparency = pdf.GState({opacity: 0.05});
+      
+      // === LARGE CENTRAL WATERMARKS ON EACH CIVIL ID ===
+      pdf.setFontSize(36);
+      pdf.setTextColor(180, 180, 180); // Light gray
+      
+      const frontCenterX = frontX + imgWidth / 2;
+      const frontCenterY = frontY + imgHeight / 2;
+      const backCenterX = backX + imgWidth / 2;
+      const backCenterY = backY + imgHeight / 2;
+      
+      // Apply transparency and draw large watermarks
+      pdf.setGState(lightTransparency);
+      pdf.text(watermark, frontCenterX, frontCenterY, {
+        align: "center",
+        angle: -30,
+      });
+      
+      pdf.text(watermark, backCenterX, backCenterY, {
+        align: "center",
+        angle: -30,
+      });
+      
+      // === LIGHT DIAGONAL BACKGROUND PATTERN ===
+      pdf.setFontSize(18);
+      pdf.setTextColor(200, 200, 200); // Lighter gray
+      
+      const diagonalSpacingX = 160;
+      const diagonalSpacingY = 140;
+      const angle = -30;
+      
+      // Apply more transparency for background pattern
+      pdf.setGState(mediumTransparency);
+      for (let y = -a4Height / 2; y < a4Height * 1.5; y += diagonalSpacingY) {
+        for (let x = -a4Width / 2; x < a4Width * 1.5; x += diagonalSpacingX) {
+          pdf.text(watermark, x, y, {
+            angle,
+          });
+        }
+      }
+      
+      // Reset graphics state to normal
+      pdf.setGState(pdf.GState({opacity: 1}));
+    }
 
     if (setProgress) setProgress(100);
     pdf.save("civil-id.pdf");

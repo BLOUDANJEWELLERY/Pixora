@@ -552,6 +552,9 @@ async function downloadPDFWithProgress(setProgress) {
 
     // Professional watermark with improved placement and lighter colors
     if (watermark) {
+      
+      pdf.setGState(new pdf.GState({ opacity: 0.4 }));
+
       pdf.setFont("helvetica", "normal");
       
       // Large watermarks on each Civil ID (moved up and lighter)
@@ -574,6 +577,8 @@ async function downloadPDFWithProgress(setProgress) {
         align: "center",
         angle: -45
       });
+      
+      pdf.setGState(new pdf.GState({ opacity: 1 }));
       
       // Diagonal pattern background on both sides
       pdf.setFontSize(16);

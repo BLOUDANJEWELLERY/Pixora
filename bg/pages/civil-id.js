@@ -550,89 +550,92 @@ async function downloadPDFWithProgress(setProgress) {
     pdf.addImage(roundedFront, "PNG", frontX, frontY, imgWidth, imgHeight);
     pdf.addImage(roundedBack, "PNG", backX, backY, imgWidth, imgHeight);
 
-    // Professional watermark with improved placement and lighter colors
-    if (watermark) {
-      
-      pdf.setGState(new pdf.GState({ opacity: 0.4 }));
-
-      pdf.setFont("helvetica", "normal");
-      
-      // Large watermarks on each Civil ID (moved up and lighter)
-      pdf.setFontSize(32);
-      pdf.setTextColor(230, 230, 230, 0.1);
-      
-      const frontCenterX = frontX + imgWidth / 2;
-      const frontCenterY = frontY + imgHeight / 2 - 20;
-      const backCenterX = backX + imgWidth / 2;
-      const backCenterY = backY + imgHeight / 2 - 20;
-      
-      // Large watermark on front Civil ID
-      pdf.text(watermark, frontCenterX, frontCenterY, {
-        align: "center",
-        angle: -45
-      });
-      
-      // Large watermark on back Civil ID
-      pdf.text(watermark, backCenterX, backCenterY, {
-        align: "center",
-        angle: -45
-      });
-      
-      pdf.setGState(new pdf.GState({ opacity: 1 }));
-      
-      // Diagonal pattern background on both sides
-      pdf.setFontSize(16);
-      pdf.setTextColor(240, 240, 240, 0.3);
-      
-      const diagonalSpacing = 150;
-      
-      // Right side pattern (top-right to bottom-left)
-      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing) {
-        const startX = a4Width + 100;
-        const startY = i;
-        
-        pdf.text(watermark, startX, startY, {
-          align: "right",
-          angle: -45
-        });
-        
-        pdf.text(watermark, startX - 200, startY + diagonalSpacing / 2, {
-          align: "right",
-          angle: -45
-        });
-      }
-      
-      // Left side pattern (top-left to bottom-right)
-      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing) {
-        const startX = -100;
-        const startY = i;
-        
-        pdf.text(watermark, startX, startY, {
-          align: "left",
-          angle: 45
-        });
-        
-        pdf.text(watermark, startX + 200, startY + diagonalSpacing / 2, {
-          align: "left",
-          angle: 45
-        });
-      }
-      
-      // Center pattern (lighter and sparse)
-      for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing * 1.5) {
-        pdf.setTextColor(245, 245, 245, 0.2);
-        
-        pdf.text(watermark, a4Width / 2, i, {
-          align: "center",
-          angle: -45
-        });
-        
-        pdf.text(watermark, a4Width / 2, i + diagonalSpacing, {
-          align: "center",
-          angle: 45
-        });
-      }
-    }
+// Professional watermark with improved placement and transparency
+if (watermark) {
+  pdf.setFont("helvetica", "normal");
+  
+  // Create graphics state for transparency
+  const transparentState = pdf.GState({opacity: 0.1});
+  const moreTransparentState = pdf.GState({opacity: 0.05});
+  
+  // Large watermarks on each Civil ID (moved up and transparent)
+  pdf.setFontSize(32);
+  pdf.setTextColor(200, 200, 200); // Light gray color
+  
+  const frontCenterX = frontX + imgWidth / 2;
+  const frontCenterY = frontY + imgHeight / 2 - 20;
+  const backCenterX = backX + imgWidth / 2;
+  const backCenterY = backY + imgHeight / 2 - 20;
+  
+  // Large watermark on front Civil ID with transparency
+  pdf.setGState(transparentState);
+  pdf.text(watermark, frontCenterX, frontCenterY, {
+    align: "center",
+    angle: -45
+  });
+  
+  // Large watermark on back Civil ID with transparency
+  pdf.text(watermark, backCenterX, backCenterY, {
+    align: "center",
+    angle: -45
+  });
+  
+  // Diagonal pattern background on both sides - even more transparent
+  pdf.setFontSize(16);
+  pdf.setTextColor(220, 220, 220); // Very light gray
+  
+  const diagonalSpacing = 150;
+  
+  // Right side pattern (top-right to bottom-left)
+  pdf.setGState(moreTransparentState);
+  for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing) {
+    const startX = a4Width + 100;
+    const startY = i;
+    
+    pdf.text(watermark, startX, startY, {
+      align: "right",
+      angle: -45
+    });
+    
+    pdf.text(watermark, startX - 200, startY + diagonalSpacing / 2, {
+      align: "right",
+      angle: -45
+    });
+  }
+  
+  // Left side pattern (top-left to bottom-right)
+  for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing) {
+    const startX = -100;
+    const startY = i;
+    
+    pdf.text(watermark, startX, startY, {
+      align: "left",
+      angle: 45
+    });
+    
+    pdf.text(watermark, startX + 200, startY + diagonalSpacing / 2, {
+      align: "left",
+      angle: 45
+    });
+  }
+  
+  // Center pattern (lightest and most sparse)
+  pdf.setTextColor(230, 230, 230); // Lightest gray
+  for (let i = -a4Height; i < a4Height * 2; i += diagonalSpacing * 1.5) {
+    pdf.text(watermark, a4Width / 2, i, {
+      align: "center",
+      angle: -45
+    });
+    
+    pdf.text(watermark, a4Width / 2, i + diagonalSpacing, {
+      align: "center",
+      angle: 45
+    });
+  }
+  
+  // Reset graphics state to normal
+  pdf.setGState(pdf.GState({opacity: 1}));
+}
 
     if (setProgress) setProgress(100);
     pdf.save("civil-id.pdf");

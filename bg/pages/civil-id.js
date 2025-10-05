@@ -466,13 +466,13 @@ async function downloadPDF() {
       pdf.setFont("helvetica", "normal");
       
       // Create graphics state for transparency
-      const lightTransparency = pdf.GState({opacity: 0.4});
-      const mediumTransparency = pdf.GState({opacity: 0.4});
-      const heavyTransparency = pdf.GState({opacity: 0.4});
+      const lightTransparency = pdf.GState({opacity: 0.6});
+      const mediumTransparency = pdf.GState({opacity: 0.6});
+      const heavyTransparency = pdf.GState({opacity: 0.6});
       
       // === LARGE CENTRAL WATERMARKS ON EACH CIVIL ID ===
       pdf.setFontSize(36);
-      pdf.setTextColor(180, 180, 180); // Light gray
+      pdf.setTextColor(200, 200, 200); // Light gray
       
       const frontCenterX = frontX + imgWidth / 2;
       const frontCenterY = frontY + imgHeight / 2;

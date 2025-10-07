@@ -3,6 +3,12 @@ import { useState, useRef, useEffect } from "react";
 import { removeBackground } from "@imgly/background-removal";
 
 export default function RemoveBgPage() {
+  
+  const [eraseMode, setEraseMode] = useState(false);
+const [isErasing, setIsErasing] = useState(false);
+const [brushSize, setBrushSize] = useState(20);
+  
+  
   const [inputImage, setInputImage] = useState(null);
   const [fgBlob, setFgBlob] = useState(null);
   const [bgOption, setBgOption] = useState("transparent");
@@ -39,6 +45,63 @@ export default function RemoveBgPage() {
 
     drawPreview();
   }, [fgBlob, bgOption, bgColor, bgFile]);
+
+
+
+useEffect(() => {
+  if (!fgBlob || !canvasRef.current) return;
+
+  const canvas = canvasRef.current;
+  const ctx = canvas.getContext("2d");
+
+  const handlePointerDown = (e) => {
+    if (!eraseMode) return;
+    setIsErasing(true);
+    eraseAt(e);
+  };
+
+  const handlePointerUp = () => {
+    if (!eraseMode) return;
+    setIsErasing(false);
+  };
+
+  const handlePointerMove = (e) => {
+    if (!eraseMode || !isErasing) return;
+    eraseAt(e);
+  };
+
+  function eraseAt(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.arc(x, y, brushSize, 0, Math.PI * 2, false);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  canvas.addEventListener("mousedown", handlePointerDown);
+  canvas.addEventListener("mousemove", handlePointerMove);
+  window.addEventListener("mouseup", handlePointerUp);
+
+  canvas.addEventListener("touchstart", handlePointerDown);
+  canvas.addEventListener("touchmove", handlePointerMove);
+  window.addEventListener("touchend", handlePointerUp);
+
+  return () => {
+    canvas.removeEventListener("mousedown", handlePointerDown);
+    canvas.removeEventListener("mousemove", handlePointerMove);
+    window.removeEventListener("mouseup", handlePointerUp);
+
+    canvas.removeEventListener("touchstart", handlePointerDown);
+    canvas.removeEventListener("touchmove", handlePointerMove);
+    window.removeEventListener("touchend", handlePointerUp);
+  };
+}, [eraseMode, isErasing, brushSize, fgBlob]);
+
 
   const handleInputChange = (e) => {
     const file = e.target.files[0];
@@ -157,6 +220,37 @@ export default function RemoveBgPage() {
             >
               Download Image
             </button>
+            
+            
+            <div className="mt-4 flex flex-col items-center gap-3">
+  <button
+    onClick={() => setEraseMode(!eraseMode)}
+    className={`py-2 px-6 rounded-xl font-semibold shadow-md transition-all duration-300 ${
+      eraseMode
+        ? "bg-red-500 hover:bg-red-600 text-white"
+        : "bg-green-500 hover:bg-green-600 text-white"
+    }`}
+  >
+    {eraseMode ? "Disable Erase Mode" : "Enable Erase Mode"}
+  </button>
+
+  {eraseMode && (
+    <div className="flex items-center gap-2">
+      <label className="font-medium text-blue-900">Brush Size:</label>
+      <input
+        type="range"
+        min="5"
+        max="100"
+        value={brushSize}
+        onChange={(e) => setBrushSize(parseInt(e.target.value))}
+        className="w-40"
+      />
+      <span className="text-blue-900">{brushSize}px</span>
+    </div>
+  )}
+</div>
+
+
           </>
         )}
       </div>

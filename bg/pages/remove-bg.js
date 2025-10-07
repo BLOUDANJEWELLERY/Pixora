@@ -226,11 +226,11 @@ export default function RemoveBgPage() {
     // Apply erase to canvas
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-    ctx.globalCompositeOperation = "destination-out");
+    ctx.globalCompositeOperation = "destination-out";
     ctx.beginPath();
     ctx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalCompositeOperation = "source-over");
+    ctx.globalCompositeOperation = "source-over";
 
     // Update last touch
     if (e.touches) {
@@ -338,7 +338,7 @@ export default function RemoveBgPage() {
       tempCtx.arc(erase.x, erase.y, erase.size, 0, Math.PI * 2);
       tempCtx.fill();
     });
-    tempCtx.globalCompositeOperation = "source-over");
+    tempCtx.globalCompositeOperation = "source-over";
 
     // Download the image
     tempCanvas.toBlob((blob) => {

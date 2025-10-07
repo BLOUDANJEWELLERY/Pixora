@@ -22,13 +22,29 @@ export default function RemoveBgPage() {
   const eraseDataRef = useRef([]);
   const lastTouchRef = useRef(null);
   const foregroundCanvasRef = useRef(null); // Separate canvas for foreground only
+  const backgroundBitmapRef = useRef(null); // Store background image bitmap
 
-  // Initialize foreground canvas
+  // Initialize foreground canvas and load background image
   useEffect(() => {
     if (fgBlob && canvasRef.current) {
       foregroundCanvasRef.current = document.createElement('canvas');
     }
   }, [fgBlob]);
+
+  // Load background image when bgFile changes
+  useEffect(() => {
+    const loadBackgroundImage = async () => {
+      if (bgFile && bgOption === "image") {
+        backgroundBitmapRef.current = await createImageBitmap(bgFile);
+      } else {
+        backgroundBitmapRef.current = null;
+      }
+    };
+    
+    if (bgFile) {
+      loadBackgroundImage();
+    }
+  }, [bgFile, bgOption]);
 
   // Live preview redraw
   useEffect(() => {
@@ -47,27 +63,22 @@ export default function RemoveBgPage() {
         canvas.height = originalFgBitmapRef.current.height;
         fgCanvas.width = originalFgBitmapRef.current.width;
         fgCanvas.height = originalFgBitmapRef.current.height;
+        
+        // Initialize foreground canvas with the original image
+        fgCtx.drawImage(originalFgBitmapRef.current, 0, 0);
       }
 
-      // Clear both canvases
+      // Clear main canvas only
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      fgCtx.clearRect(0, 0, fgCanvas.width, fgCanvas.height);
 
       // Draw background on main canvas
       if (bgOption === "color") {
         ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-      } else if (bgOption === "image" && bgFile) {
-        const bgBitmap = await createImageBitmap(bgFile);
-        ctx.drawImage(bgBitmap, 0, 0, canvas.width, canvas.height);
+      } else if (bgOption === "image" && backgroundBitmapRef.current) {
+        ctx.drawImage(backgroundBitmapRef.current, 0, 0, canvas.width, canvas.height);
       }
       // For transparent background, we don't draw anything
-
-      // Draw foreground image on foreground canvas (without erase operations first)
-      fgCtx.drawImage(originalFgBitmapRef.current, 0, 0);
-
-      // Apply erase operations to foreground canvas only
-      applyEraseOperations(fgCtx);
 
       // Draw the foreground canvas (with erasures) onto main canvas
       ctx.drawImage(fgCanvas, 0, 0);
@@ -97,6 +108,7 @@ export default function RemoveBgPage() {
       setBgFile(null);
       setBgOption("transparent");
       originalFgBitmapRef.current = null;
+      backgroundBitmapRef.current = null;
       eraseDataRef.current = [];
       setZoom(1);
       setPosition({ x: 0, y: 0 });
@@ -275,9 +287,8 @@ export default function RemoveBgPage() {
     if (bgOption === "color") {
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-    } else if (bgOption === "image" && bgFile) {
-      const bgBitmap = await createImageBitmap(bgFile);
-      ctx.drawImage(bgBitmap, 0, 0, canvas.width, canvas.height);
+    } else if (bgOption === "image" && backgroundBitmapRef.current) {
+      ctx.drawImage(backgroundBitmapRef.current, 0, 0, canvas.width, canvas.height);
     }
     // For transparent background, we don't draw anything
 
@@ -346,46 +357,30 @@ export default function RemoveBgPage() {
     setPosition({ x: 0, y: 0 });
   };
 
-  const downloadImage = () => {
-    if (!canvasRef.current || !originalFgBitmapRef.current) return;
+  const downloadImage = async () => {
+    if (!canvasRef.current || !originalFgBitmapRef.current || !foregroundCanvasRef.current) return;
     
-    // Create a temporary canvas to apply all operations
+    // Create a temporary canvas for the final output
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
     tempCanvas.width = originalFgBitmapRef.current.width;
     tempCanvas.height = originalFgBitmapRef.current.height;
 
-    // Draw background first
+    // Clear the temporary canvas
+    tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+    // Draw background first (this should NOT be affected by erase operations)
     if (bgOption === "color") {
       tempCtx.fillStyle = bgColor;
       tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-    } else if (bgOption === "image" && bgFile) {
-      // For background image, create bitmap and draw it
-      createImageBitmap(bgFile).then(bgBitmap => {
-        tempCtx.drawImage(bgBitmap, 0, 0, tempCanvas.width, tempCanvas.height);
-        drawForegroundAndDownload(tempCanvas, tempCtx);
-      });
-      return; // Exit early, will continue in promise
-    } else {
-      // Transparent background - just clear
-      tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+    } else if (bgOption === "image" && backgroundBitmapRef.current) {
+      tempCtx.drawImage(backgroundBitmapRef.current, 0, 0, tempCanvas.width, tempCanvas.height);
     }
+    // For transparent background, we don't draw anything
 
-    drawForegroundAndDownload(tempCanvas, tempCtx);
-  };
-
-  const drawForegroundAndDownload = (tempCanvas, tempCtx) => {
-    // Draw foreground image
-    tempCtx.drawImage(originalFgBitmapRef.current, 0, 0);
-
-    // Apply erase operations to foreground only
-    tempCtx.globalCompositeOperation = "destination-out";
-    eraseDataRef.current.forEach(erase => {
-      tempCtx.beginPath();
-      tempCtx.arc(erase.x, erase.y, erase.size, 0, Math.PI * 2);
-      tempCtx.fill();
-    });
-    tempCtx.globalCompositeOperation = "source-over";
+    // Draw the foreground canvas (which already has the erase operations applied)
+    // This will show the background through the erased areas
+    tempCtx.drawImage(foregroundCanvasRef.current, 0, 0);
 
     // Download the image
     tempCanvas.toBlob((blob) => {
@@ -404,7 +399,7 @@ export default function RemoveBgPage() {
       const fgCanvas = foregroundCanvasRef.current;
       const fgCtx = fgCanvas.getContext("2d");
       
-      // Reset foreground canvas
+      // Reset foreground canvas to the original image
       fgCtx.clearRect(0, 0, fgCanvas.width, fgCanvas.height);
       fgCtx.drawImage(originalFgBitmapRef.current, 0, 0);
       

@@ -705,7 +705,7 @@ export default function RemoveBgPage() {
 
                 {isErasing && eraseMode === "color" && !isColorPicking && selectedColor && (
                   <p className="text-sm text-green-700 bg-green-100 p-2 rounded-lg">
-                    Color {selectedColor.hex} erased! Click "Color Erase" again to select another color.
+                    Color {selectedColor.hex} erased! Click &quot;Color Erase&quot; again to select another color.
                   </p>
                 )}
 

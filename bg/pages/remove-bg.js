@@ -3,31 +3,32 @@ import { useState, useRef, useEffect } from "react";
 import { removeBackground } from "@imgly/background-removal";
 
 export default function RemoveBgPage() {
-  
   const [eraseMode, setEraseMode] = useState(false);
-const [isErasing, setIsErasing] = useState(false);
-const [brushSize, setBrushSize] = useState(20);
-  
-  
+  const [restoreMode, setRestoreMode] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [brushSize, setBrushSize] = useState(20);
+
   const [inputImage, setInputImage] = useState(null);
   const [fgBlob, setFgBlob] = useState(null);
   const [bgOption, setBgOption] = useState("transparent");
   const [bgColor, setBgColor] = useState("#ffffff");
   const [bgFile, setBgFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showEditor, setShowEditor] = useState(false);
 
   const canvasRef = useRef(null);
+  const cursorRef = useRef(null);
+  const originalImageRef = useRef(null);
 
-  // Live preview redraw
+  // Redraw preview when background changes
   useEffect(() => {
     const drawPreview = async () => {
       if (!fgBlob || !canvasRef.current) return;
-
       const fgBitmap = await createImageBitmap(fgBlob);
       const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
       canvas.width = fgBitmap.width;
       canvas.height = fgBitmap.height;
-      const ctx = canvas.getContext("2d");
 
       // Draw background
       if (bgOption === "color") {
@@ -46,63 +47,76 @@ const [brushSize, setBrushSize] = useState(20);
     drawPreview();
   }, [fgBlob, bgOption, bgColor, bgFile]);
 
+  // Handle brush drawing / restoring
+  useEffect(() => {
+    if (!fgBlob || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
 
+    const handlePointerDown = (e) => {
+      if (!eraseMode && !restoreMode) return;
+      setIsDrawing(true);
+      drawAt(e);
+    };
 
-useEffect(() => {
-  if (!fgBlob || !canvasRef.current) return;
+    const handlePointerUp = () => setIsDrawing(false);
 
-  const canvas = canvasRef.current;
-  const ctx = canvas.getContext("2d");
+    const handlePointerMove = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const y = (e.clientY - rect.top) * (canvas.height / rect.height);
 
-  const handlePointerDown = (e) => {
-    if (!eraseMode) return;
-    setIsErasing(true);
-    eraseAt(e);
-  };
+      // Move visible circular brush cursor
+      if (cursorRef.current) {
+        cursorRef.current.style.left = `${x - brushSize}px`;
+        cursorRef.current.style.top = `${y - brushSize}px`;
+      }
 
-  const handlePointerUp = () => {
-    if (!eraseMode) return;
-    setIsErasing(false);
-  };
+      if (!isDrawing) return;
+      drawAt(e);
+    };
 
-  const handlePointerMove = (e) => {
-    if (!eraseMode || !isErasing) return;
-    eraseAt(e);
-  };
+    const drawAt = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const y = (e.clientY - rect.top) * (canvas.height / rect.height);
 
-  function eraseAt(e) {
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x, y, brushSize, 0, Math.PI * 2, false);
+      ctx.clip();
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.globalCompositeOperation = "destination-out";
-    ctx.arc(x, y, brushSize, 0, Math.PI * 2, false);
-    ctx.fill();
-    ctx.restore();
-  }
+      if (eraseMode) {
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.fill();
+      } else if (restoreMode && originalImageRef.current) {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.drawImage(originalImageRef.current, 0, 0);
+      }
 
-  canvas.addEventListener("mousedown", handlePointerDown);
-  canvas.addEventListener("mousemove", handlePointerMove);
-  window.addEventListener("mouseup", handlePointerUp);
+      ctx.restore();
+    };
 
-  canvas.addEventListener("touchstart", handlePointerDown);
-  canvas.addEventListener("touchmove", handlePointerMove);
-  window.addEventListener("touchend", handlePointerUp);
+    canvas.addEventListener("mousedown", handlePointerDown);
+    canvas.addEventListener("mousemove", handlePointerMove);
+    window.addEventListener("mouseup", handlePointerUp);
 
-  return () => {
-    canvas.removeEventListener("mousedown", handlePointerDown);
-    canvas.removeEventListener("mousemove", handlePointerMove);
-    window.removeEventListener("mouseup", handlePointerUp);
+    canvas.addEventListener("touchstart", handlePointerDown);
+    canvas.addEventListener("touchmove", handlePointerMove);
+    window.addEventListener("touchend", handlePointerUp);
 
-    canvas.removeEventListener("touchstart", handlePointerDown);
-    canvas.removeEventListener("touchmove", handlePointerMove);
-    window.removeEventListener("touchend", handlePointerUp);
-  };
-}, [eraseMode, isErasing, brushSize, fgBlob]);
+    return () => {
+      canvas.removeEventListener("mousedown", handlePointerDown);
+      canvas.removeEventListener("mousemove", handlePointerMove);
+      window.removeEventListener("mouseup", handlePointerUp);
 
+      canvas.removeEventListener("touchstart", handlePointerDown);
+      canvas.removeEventListener("touchmove", handlePointerMove);
+      window.removeEventListener("touchend", handlePointerUp);
+    };
+  }, [eraseMode, restoreMode, brushSize, fgBlob, isDrawing]);
 
+  // Upload input
   const handleInputChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -114,31 +128,28 @@ useEffect(() => {
   };
 
   const processImage = async () => {
-    if (!inputImage) return alert("Please upload an image");
-
+    if (!inputImage) return alert("Please upload an image first.");
     setLoading(true);
     try {
       const blob = await removeBackground(inputImage);
       setFgBlob(blob);
+
+      // Keep a copy for restore brush
+      const img = new Image();
+      img.src = URL.createObjectURL(blob);
+      img.onload = () => (originalImageRef.current = img);
     } catch (err) {
-      console.error(err);
-      alert("Failed to process image: " + err.message);
+      alert("Image processing failed: " + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleBgFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) setBgFile(file);
-  };
-
   const downloadImage = () => {
     if (!canvasRef.current) return;
     canvasRef.current.toBlob((blob) => {
-      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
+      a.href = URL.createObjectURL(blob);
       a.download = "output.png";
       a.click();
     }, "image/png");
@@ -146,134 +157,157 @@ useEffect(() => {
 
   return (
     <>
-    <Header />
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6 animate-fadeIn">
-      <h1 className="text-4xl md:text-5xl font-extrabold text-blue-900 mb-10 text-center drop-shadow-lg tracking-wide animate-fadeIn">
-        Background Remover & Replacer
-      </h1>
+      <Header />
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200">
+        <h1 className="text-4xl md:text-5xl font-extrabold text-blue-900 mb-10 text-center tracking-wide">
+          Background Remover & Editor
+        </h1>
 
-      {/* Glassmorphic Upload Card */}
-      <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30 transition-transform transform hover:scale-[1.02] duration-300">
-        <div className="flex flex-col">
-          <label className="mb-2 font-semibold text-blue-900">Upload Image:</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleInputChange}
-            className="p-2 border rounded-lg border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/60"
-          />
+        <div className="bg-white/40 backdrop-blur-md rounded-3xl shadow-2xl p-8 w-full max-w-xl border border-blue-200 border-opacity-30">
+          <div className="flex flex-col mb-4">
+            <label className="font-semibold text-blue-900 mb-2">Upload Image:</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleInputChange}
+              className="p-2 border rounded-lg border-blue-300 bg-white/60 focus:outline-none"
+            />
+          </div>
+
+          {!fgBlob && inputImage && (
+            <button
+              onClick={processImage}
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-3 font-semibold rounded-2xl shadow-md hover:opacity-90"
+            >
+              {loading ? "Processing..." : "Process Image"}
+            </button>
+          )}
+
+          {fgBlob && (
+            <>
+              <div className="flex flex-col gap-3 mt-4">
+                <label className="font-semibold text-blue-900">Background:</label>
+                <select
+                  value={bgOption}
+                  onChange={(e) => setBgOption(e.target.value)}
+                  className="p-2 border rounded-lg border-blue-300 bg-white/60"
+                >
+                  <option value="transparent">Transparent</option>
+                  <option value="color">Solid Color</option>
+                  <option value="image">Image</option>
+                </select>
+
+                {bgOption === "color" && (
+                  <input
+                    type="color"
+                    value={bgColor}
+                    onChange={(e) => setBgColor(e.target.value)}
+                    className="w-20 h-10 border rounded-lg cursor-pointer border-blue-300"
+                  />
+                )}
+
+                {bgOption === "image" && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setBgFile(e.target.files[0])}
+                    className="p-2 border rounded-lg border-blue-300 bg-white/60"
+                  />
+                )}
+              </div>
+
+              <div className="flex flex-col items-center gap-3 mt-6">
+                <button
+                  onClick={() => setShowEditor(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-semibold shadow-md"
+                >
+                  Open Eraser / Restore Editor
+                </button>
+                <button
+                  onClick={downloadImage}
+                  className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl font-semibold shadow-md"
+                >
+                  Download Image
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
-        {!fgBlob && inputImage && (
-          <button
-            onClick={processImage}
-            disabled={loading}
-            className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-bold py-3 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "Processing..." : "Process Image"}
-          </button>
-        )}
-
-        {/* Show background options only after processing */}
-        {fgBlob && (
-          <>
-            <div className="flex flex-col gap-2">
-              <label className="font-semibold text-blue-900">Background Option:</label>
-              <select
-                value={bgOption}
-                onChange={(e) => setBgOption(e.target.value)}
-                className="p-2 border rounded-lg border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/60"
+        {/* Editor Modal */}
+        {showEditor && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white rounded-3xl p-6 shadow-2xl relative max-w-4xl w-full flex flex-col items-center">
+              <button
+                onClick={() => setShowEditor(false)}
+                className="absolute top-3 right-3 text-red-600 text-xl font-bold"
               >
-                <option value="transparent">Transparent</option>
-                <option value="color">Solid Color</option>
-                <option value="image">Image</option>
-              </select>
+                ✕
+              </button>
+
+              <h2 className="text-2xl font-semibold text-blue-900 mb-4">Eraser / Restore Mode</h2>
+
+              <div className="flex gap-3 mb-4">
+                <button
+                  onClick={() => {
+                    setEraseMode(!eraseMode);
+                    setRestoreMode(false);
+                  }}
+                  className={`px-6 py-2 rounded-lg font-semibold ${
+                    eraseMode ? "bg-red-500 text-white" : "bg-gray-300"
+                  }`}
+                >
+                  {eraseMode ? "Erasing…" : "Erase Mode"}
+                </button>
+                <button
+                  onClick={() => {
+                    setRestoreMode(!restoreMode);
+                    setEraseMode(false);
+                  }}
+                  className={`px-6 py-2 rounded-lg font-semibold ${
+                    restoreMode ? "bg-green-500 text-white" : "bg-gray-300"
+                  }`}
+                >
+                  {restoreMode ? "Restoring…" : "Restore Mode"}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3 mb-4">
+                <label className="font-medium text-blue-900">Brush Size:</label>
+                <input
+                  type="range"
+                  min="5"
+                  max="100"
+                  value={brushSize}
+                  onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                  className="w-40"
+                />
+                <span className="text-blue-900">{brushSize}px</span>
+              </div>
+
+              <div className="relative">
+                <canvas
+                  ref={canvasRef}
+                  className="rounded-2xl border border-blue-300 shadow-lg cursor-none"
+                />
+                <div
+                  ref={cursorRef}
+                  style={{
+                    width: `${brushSize * 2}px`,
+                    height: `${brushSize * 2}px`,
+                    border: "2px solid rgba(0,0,0,0.3)",
+                    borderRadius: "50%",
+                    position: "absolute",
+                    pointerEvents: "none",
+                    transform: "translate(-50%, -50%)",
+                  }}
+                />
+              </div>
             </div>
-
-            {bgOption === "color" && (
-              <div className="flex flex-col gap-2">
-                <label className="font-semibold text-blue-900">Pick Background Color:</label>
-                <input
-                  type="color"
-                  value={bgColor}
-                  onChange={(e) => setBgColor(e.target.value)}
-                  className="w-20 h-10 border rounded-lg cursor-pointer border-blue-300"
-                />
-              </div>
-            )}
-
-            {bgOption === "image" && (
-              <div className="flex flex-col gap-2">
-                <label className="font-semibold text-blue-900">Upload Background Image:</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleBgFileChange}
-                  className="p-2 border rounded-lg border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/60"
-                />
-              </div>
-            )}
-
-            <button
-              onClick={downloadImage}
-              className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-bold py-3 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] mt-4"
-            >
-              Download Image
-            </button>
-            
-            
-            <div className="mt-4 flex flex-col items-center gap-3">
-  <button
-    onClick={() => setEraseMode(!eraseMode)}
-    className={`py-2 px-6 rounded-xl font-semibold shadow-md transition-all duration-300 ${
-      eraseMode
-        ? "bg-red-500 hover:bg-red-600 text-white"
-        : "bg-green-500 hover:bg-green-600 text-white"
-    }`}
-  >
-    {eraseMode ? "Disable Erase Mode" : "Enable Erase Mode"}
-  </button>
-
-  {eraseMode && (
-    <div className="flex items-center gap-2">
-      <label className="font-medium text-blue-900">Brush Size:</label>
-      <input
-        type="range"
-        min="5"
-        max="100"
-        value={brushSize}
-        onChange={(e) => setBrushSize(parseInt(e.target.value))}
-        className="w-40"
-      />
-      <span className="text-blue-900">{brushSize}px</span>
-    </div>
-  )}
-</div>
-
-
-          </>
+          </div>
         )}
       </div>
-
-      {/* Preview Card */}
-      {fgBlob && (
-        <div className="mt-10 bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-6 w-full max-w-xl flex flex-col items-center gap-4 border border-blue-200 border-opacity-30 animate-fadeIn">
-          <h2 className="text-2xl md:text-3xl font-semibold text-blue-900 drop-shadow-sm">Live Preview:</h2>
-          <canvas ref={canvasRef} className="rounded-2xl border border-blue-300 max-w-full shadow-md" />
-        </div>
-      )}
-
-      {/* Fade-in Animation */}
-      <style jsx>{`
-        @keyframes fadeIn {
-          0% { opacity: 0; transform: translateY(10px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.6s ease forwards;
-        }
-      `}</style>
-    </div>
     </>
   );
 }

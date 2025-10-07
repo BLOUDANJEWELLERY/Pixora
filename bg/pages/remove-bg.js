@@ -260,7 +260,7 @@ export default function RemoveBgPage() {
     fgCtx.beginPath();
     fgCtx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
     fgCtx.fill();
-    fgCtx.globalCompositeOperation = "source-over");
+    fgCtx.globalCompositeOperation = "source-over";
 
     // Redraw the main canvas with updated foreground
     redrawMainCanvas();

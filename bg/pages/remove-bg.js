@@ -55,9 +55,8 @@ export default function RemoveBgPage() {
 
     setLoading(true);
     try {
-      const imageURL = URL.createObjectURL(inputImage);
-const blob = await removeBackground({ image: imageURL });
-      setFgBlob(blob);
+      const blob = await removeBackground({ image: inputImage });
+       setFgBlob(blob);
     } catch (err) {
       console.error(err);
       alert("Failed to process image: " + err.message);

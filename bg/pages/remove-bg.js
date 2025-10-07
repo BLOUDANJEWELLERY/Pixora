@@ -623,8 +623,8 @@ export default function RemoveBgPage() {
                   style={{
                     left: cursorPosition.x - brushSize * zoom / 2,
                     top: cursorPosition.y - brushSize * zoom / 2,
-                    width: `${brushSize * zoom}px`,
-                    height: `${brushSize * zoom}px`,
+                    width: `${brushSize * zoom + 10}px`,
+                    height: `${brushSize * zoom + 10}px`,
                     border: '2px solid red',
                     backgroundColor: 'rgba(255, 0, 0, 0.2)',
                     boxShadow: '0 0 0 1px white'

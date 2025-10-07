@@ -14,6 +14,7 @@ export default function RemoveBgPage() {
   const [zoom, setZoom] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0, visible: false });
 
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -69,7 +70,7 @@ export default function RemoveBgPage() {
       ctx.arc(erase.x, erase.y, erase.size, 0, Math.PI * 2);
       ctx.fill();
     });
-    ctx.globalCompositeOperation = "source-over";
+    ctx.globalCompositeOperation = "source-over");
   };
 
   const handleInputChange = (e) => {
@@ -129,11 +130,46 @@ export default function RemoveBgPage() {
       clientY = e.clientY;
     }
 
+    // Update cursor position for brush preview
+    setCursorPosition({
+      x: clientX - rect.left,
+      y: clientY - rect.top,
+      visible: true
+    });
+
     // Adjust for zoom and position
     const x = ((clientX - rect.left) / zoom) - (position.x / zoom);
     const y = ((clientY - rect.top) / zoom) - (position.y / zoom);
 
     return { x, y };
+  };
+
+  // Handle cursor movement for brush preview
+  const handleCursorMove = (e) => {
+    if (!isErasing || !containerRef.current) return;
+    
+    const container = containerRef.current;
+    const rect = container.getBoundingClientRect();
+    
+    let clientX, clientY;
+    
+    if (e.touches) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    setCursorPosition({
+      x: clientX - rect.left,
+      y: clientY - rect.top,
+      visible: true
+    });
+  };
+
+  const handleCursorLeave = () => {
+    setCursorPosition(prev => ({ ...prev, visible: false }));
   };
 
   // Handle erase start
@@ -161,7 +197,7 @@ export default function RemoveBgPage() {
     ctx.beginPath();
     ctx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalCompositeOperation = "source-over";
+    ctx.globalCompositeOperation = "source-over");
 
     // Store last touch for continuous erasing
     if (e.touches) {
@@ -190,11 +226,11 @@ export default function RemoveBgPage() {
     // Apply erase to canvas
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-    ctx.globalCompositeOperation = "destination-out";
+    ctx.globalCompositeOperation = "destination-out");
     ctx.beginPath();
     ctx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalCompositeOperation = "source-over";
+    ctx.globalCompositeOperation = "source-over");
 
     // Update last touch
     if (e.touches) {
@@ -264,30 +300,47 @@ export default function RemoveBgPage() {
   };
 
   const downloadImage = () => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || !originalFgBitmapRef.current) return;
     
     // Create a temporary canvas to apply all operations
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
-    tempCanvas.width = canvasRef.current.width;
-    tempCanvas.height = canvasRef.current.height;
+    tempCanvas.width = originalFgBitmapRef.current.width;
+    tempCanvas.height = originalFgBitmapRef.current.height;
 
-    // Draw background
+    // Draw background first
     if (bgOption === "color") {
       tempCtx.fillStyle = bgColor;
       tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
     } else if (bgOption === "image" && bgFile) {
-      // For background image, we need to handle this differently
-      // Since we can't directly draw the blob, we'll use the current canvas
-      tempCtx.drawImage(canvasRef.current, 0, 0);
+      // For background image, create bitmap and draw it
+      createImageBitmap(bgFile).then(bgBitmap => {
+        tempCtx.drawImage(bgBitmap, 0, 0, tempCanvas.width, tempCanvas.height);
+        drawForegroundAndDownload(tempCanvas, tempCtx);
+      });
+      return; // Exit early, will continue in promise
     } else {
-      // Transparent background - draw foreground with erasures
-      if (originalFgBitmapRef.current) {
-        tempCtx.drawImage(originalFgBitmapRef.current, 0, 0);
-        applyEraseOperations(tempCtx);
-      }
+      // Transparent background - just clear
+      tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
     }
 
+    drawForegroundAndDownload(tempCanvas, tempCtx);
+  };
+
+  const drawForegroundAndDownload = (tempCanvas, tempCtx) => {
+    // Draw foreground image
+    tempCtx.drawImage(originalFgBitmapRef.current, 0, 0);
+
+    // Apply erase operations
+    tempCtx.globalCompositeOperation = "destination-out";
+    eraseDataRef.current.forEach(erase => {
+      tempCtx.beginPath();
+      tempCtx.arc(erase.x, erase.y, erase.size, 0, Math.PI * 2);
+      tempCtx.fill();
+    });
+    tempCtx.globalCompositeOperation = "source-over");
+
+    // Download the image
     tempCanvas.toBlob((blob) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -485,6 +538,9 @@ export default function RemoveBgPage() {
                 cursor: isErasing ? 'crosshair' : isDragging ? 'grabbing' : 'grab',
                 touchAction: 'none' // This prevents browser handling of touch gestures
               }}
+              onMouseMove={handleCursorMove}
+              onMouseLeave={handleCursorLeave}
+              onTouchMove={handleCursorMove}
             >
               <div
                 style={{
@@ -499,16 +555,43 @@ export default function RemoveBgPage() {
                   className={`block ${isErasing ? 'border-red-400' : 'border-blue-300'}`}
                   // Mouse events
                   onMouseDown={isErasing ? handleEraseStart : handlePanStart}
-                  onMouseMove={isErasing ? handleEraseMove : handlePanMove}
+                  onMouseMove={(e) => {
+                    handleCursorMove(e);
+                    if (isErasing) handleEraseMove(e);
+                    else handlePanMove(e);
+                  }}
                   onMouseUp={handlePanEnd}
-                  onMouseLeave={handlePanEnd}
+                  onMouseLeave={() => {
+                    handlePanEnd();
+                    handleCursorLeave();
+                  }}
                   // Touch events
                   onTouchStart={isErasing ? handleEraseStart : handlePanStart}
-                  onTouchMove={isErasing ? handleEraseMove : handlePanMove}
+                  onTouchMove={(e) => {
+                    handleCursorMove(e);
+                    if (isErasing) handleEraseMove(e);
+                    else handlePanMove(e);
+                  }}
                   onTouchEnd={handlePanEnd}
                   onTouchCancel={handlePanEnd}
                 />
               </div>
+
+              {/* Brush Preview */}
+              {isErasing && cursorPosition.visible && (
+                <div 
+                  className="absolute pointer-events-none border-2 border-red-500 rounded-full"
+                  style={{
+                    left: cursorPosition.x - (brushSize * zoom / 2),
+                    top: cursorPosition.y - (brushSize * zoom / 2),
+                    width: `${brushSize * zoom}px`,
+                    height: `${brushSize * zoom}px`,
+                    border: '2px solid red',
+                    boxShadow: '0 0 0 1px white inset, 0 0 5px rgba(0,0,0,0.5)'
+                  }}
+                />
+              )}
+
               {isErasing && (
                 <div className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-semibold animate-pulse">
                   Erase Mode Active

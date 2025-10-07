@@ -21,26 +21,39 @@ export default function RemoveBgPage() {
   const originalFgBitmapRef = useRef(null);
   const eraseDataRef = useRef([]);
   const lastTouchRef = useRef(null);
+  const foregroundCanvasRef = useRef(null); // Separate canvas for foreground only
+
+  // Initialize foreground canvas
+  useEffect(() => {
+    if (fgBlob && canvasRef.current) {
+      foregroundCanvasRef.current = document.createElement('canvas');
+    }
+  }, [fgBlob]);
 
   // Live preview redraw
   useEffect(() => {
     const drawPreview = async () => {
-      if (!fgBlob || !canvasRef.current) return;
+      if (!fgBlob || !canvasRef.current || !foregroundCanvasRef.current) return;
 
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
+      const fgCanvas = foregroundCanvasRef.current;
+      const fgCtx = fgCanvas.getContext("2d");
 
       // Store original bitmap if not already stored
       if (!originalFgBitmapRef.current) {
         originalFgBitmapRef.current = await createImageBitmap(fgBlob);
         canvas.width = originalFgBitmapRef.current.width;
         canvas.height = originalFgBitmapRef.current.height;
+        fgCanvas.width = originalFgBitmapRef.current.width;
+        fgCanvas.height = originalFgBitmapRef.current.height;
       }
 
-      // Clear canvas
+      // Clear both canvases
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      fgCtx.clearRect(0, 0, fgCanvas.width, fgCanvas.height);
 
-      // Draw background
+      // Draw background on main canvas
       if (bgOption === "color") {
         ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -50,17 +63,20 @@ export default function RemoveBgPage() {
       }
       // For transparent background, we don't draw anything
 
-      // Draw foreground image
-      ctx.drawImage(originalFgBitmapRef.current, 0, 0);
+      // Draw foreground image on foreground canvas (without erase operations first)
+      fgCtx.drawImage(originalFgBitmapRef.current, 0, 0);
 
-      // Apply erase operations
-      applyEraseOperations(ctx);
+      // Apply erase operations to foreground canvas only
+      applyEraseOperations(fgCtx);
+
+      // Draw the foreground canvas (with erasures) onto main canvas
+      ctx.drawImage(fgCanvas, 0, 0);
     };
 
     drawPreview();
   }, [fgBlob, bgOption, bgColor, bgFile]);
 
-  // Apply all erase operations to the canvas
+  // Apply all erase operations to the foreground canvas
   const applyEraseOperations = (ctx) => {
     if (!ctx || eraseDataRef.current.length === 0) return;
 
@@ -137,7 +153,7 @@ export default function RemoveBgPage() {
       visible: true
     });
 
-    // Adjust for zoom and position
+    // Adjust for zoom and position to get actual image coordinates
     const x = ((clientX - rect.left) / zoom) - (position.x / zoom);
     const y = ((clientY - rect.top) / zoom) - (position.y / zoom);
 
@@ -174,7 +190,7 @@ export default function RemoveBgPage() {
 
   // Handle erase start
   const handleEraseStart = (e) => {
-    if (!isErasing || !canvasRef.current || !fgBlob) return;
+    if (!isErasing || !canvasRef.current || !fgBlob || !foregroundCanvasRef.current) return;
     
     // Prevent default to avoid scrolling
     e.preventDefault();
@@ -190,14 +206,17 @@ export default function RemoveBgPage() {
       size: brushSize
     });
 
-    // Apply erase to canvas
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    ctx.globalCompositeOperation = "destination-out";
-    ctx.beginPath();
-    ctx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalCompositeOperation = "source-over";
+    // Apply erase to foreground canvas only
+    const fgCanvas = foregroundCanvasRef.current;
+    const fgCtx = fgCanvas.getContext("2d");
+    fgCtx.globalCompositeOperation = "destination-out";
+    fgCtx.beginPath();
+    fgCtx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
+    fgCtx.fill();
+    fgCtx.globalCompositeOperation = "source-over";
+
+    // Redraw the main canvas with updated foreground
+    redrawMainCanvas();
 
     // Store last touch for continuous erasing
     if (e.touches) {
@@ -207,7 +226,7 @@ export default function RemoveBgPage() {
 
   // Handle continuous erasing
   const handleEraseMove = (e) => {
-    if (!isErasing || !canvasRef.current || !fgBlob) return;
+    if (!isErasing || !canvasRef.current || !fgBlob || !foregroundCanvasRef.current) return;
     
     // Prevent default to avoid scrolling
     e.preventDefault();
@@ -223,19 +242,47 @@ export default function RemoveBgPage() {
       size: brushSize
     });
 
-    // Apply erase to canvas
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    ctx.globalCompositeOperation = "destination-out";
-    ctx.beginPath();
-    ctx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalCompositeOperation = "source-over";
+    // Apply erase to foreground canvas only
+    const fgCanvas = foregroundCanvasRef.current;
+    const fgCtx = fgCanvas.getContext("2d");
+    fgCtx.globalCompositeOperation = "destination-out";
+    fgCtx.beginPath();
+    fgCtx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
+    fgCtx.fill();
+    fgCtx.globalCompositeOperation = "source-over";
+
+    // Redraw the main canvas with updated foreground
+    redrawMainCanvas();
 
     // Update last touch
     if (e.touches) {
       lastTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     }
+  };
+
+  // Redraw main canvas with background and foreground
+  const redrawMainCanvas = async () => {
+    if (!canvasRef.current || !foregroundCanvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const fgCanvas = foregroundCanvasRef.current;
+
+    // Clear main canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw background
+    if (bgOption === "color") {
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    } else if (bgOption === "image" && bgFile) {
+      const bgBitmap = await createImageBitmap(bgFile);
+      ctx.drawImage(bgBitmap, 0, 0, canvas.width, canvas.height);
+    }
+    // For transparent background, we don't draw anything
+
+    // Draw foreground canvas (with erasures) onto main canvas
+    ctx.drawImage(fgCanvas, 0, 0);
   };
 
   // Handle panning (image movement)
@@ -331,7 +378,7 @@ export default function RemoveBgPage() {
     // Draw foreground image
     tempCtx.drawImage(originalFgBitmapRef.current, 0, 0);
 
-    // Apply erase operations
+    // Apply erase operations to foreground only
     tempCtx.globalCompositeOperation = "destination-out";
     eraseDataRef.current.forEach(erase => {
       tempCtx.beginPath();
@@ -353,19 +400,16 @@ export default function RemoveBgPage() {
 
   const resetErase = () => {
     eraseDataRef.current = [];
-    if (canvasRef.current && originalFgBitmapRef.current) {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (canvasRef.current && originalFgBitmapRef.current && foregroundCanvasRef.current) {
+      const fgCanvas = foregroundCanvasRef.current;
+      const fgCtx = fgCanvas.getContext("2d");
       
-      // Redraw everything
-      if (bgOption === "color") {
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      } else if (bgOption === "image" && bgFile) {
-        // Background image will be redrawn in the next effect
-      }
-      ctx.drawImage(originalFgBitmapRef.current, 0, 0);
+      // Reset foreground canvas
+      fgCtx.clearRect(0, 0, fgCanvas.width, fgCanvas.height);
+      fgCtx.drawImage(originalFgBitmapRef.current, 0, 0);
+      
+      // Redraw main canvas
+      redrawMainCanvas();
     }
   };
 
@@ -577,17 +621,18 @@ export default function RemoveBgPage() {
                 />
               </div>
 
-              {/* Brush Preview */}
+              {/* Brush Preview - Now matches actual erase size exactly */}
               {isErasing && cursorPosition.visible && (
                 <div 
-                  className="absolute pointer-events-none border-2 border-red-500 rounded-full"
+                  className="absolute pointer-events-none rounded-full"
                   style={{
-                    left: cursorPosition.x - (brushSize * zoom / 2),
-                    top: cursorPosition.y - (brushSize * zoom / 2),
+                    left: cursorPosition.x - brushSize * zoom / 2,
+                    top: cursorPosition.y - brushSize * zoom / 2,
                     width: `${brushSize * zoom}px`,
                     height: `${brushSize * zoom}px`,
                     border: '2px solid red',
-                    boxShadow: '0 0 0 1px white inset, 0 0 5px rgba(0,0,0,0.5)'
+                    backgroundColor: 'rgba(255, 0, 0, 0.2)',
+                    boxShadow: '0 0 0 1px white'
                   }}
                 />
               )}

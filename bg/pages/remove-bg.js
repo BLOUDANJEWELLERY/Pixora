@@ -621,8 +621,8 @@ export default function RemoveBgPage() {
                 <div 
                   className="absolute pointer-events-none rounded-full"
                   style={{
-                    left: cursorPosition.x - brushSize * zoom / 2,
-                    top: cursorPosition.y - brushSize * zoom / 2,
+                    left: cursorPosition.x - brushSize + 10 * zoom / 2,
+                    top: cursorPosition.y - brushSize + 10 * zoom / 2,
                     width: `${brushSize * zoom + 10}px`,
                     height: `${brushSize * zoom + 10}px`,
                     border: '2px solid red',

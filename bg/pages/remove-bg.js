@@ -11,10 +11,15 @@ export default function RemoveBgPage() {
   const [loading, setLoading] = useState(false);
   const [isErasing, setIsErasing] = useState(false);
   const [brushSize, setBrushSize] = useState(20);
+  const [zoom, setZoom] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
 
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
   const originalFgBitmapRef = useRef(null);
   const eraseDataRef = useRef([]);
+  const lastTouchRef = useRef(null);
 
   // Live preview redraw
   useEffect(() => {
@@ -76,6 +81,8 @@ export default function RemoveBgPage() {
       setBgOption("transparent");
       originalFgBitmapRef.current = null;
       eraseDataRef.current = [];
+      setZoom(1);
+      setPosition({ x: 0, y: 0 });
     }
   };
 
@@ -87,6 +94,8 @@ export default function RemoveBgPage() {
       const blob = await removeBackground(inputImage);
       setFgBlob(blob);
       eraseDataRef.current = []; // Reset erase data
+      setZoom(1);
+      setPosition({ x: 0, y: 0 });
     } catch (err) {
       console.error(err);
       alert("Failed to process image: " + err.message);
@@ -100,38 +109,158 @@ export default function RemoveBgPage() {
     if (file) setBgFile(file);
   };
 
-  // Handle canvas click for erasing
-  const handleCanvasClick = (e) => {
-    if (!isErasing || !canvasRef.current || !fgBlob) return;
-
+  // Get coordinates from event (handles both mouse and touch)
+  const getCoordinates = (e) => {
     const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    const container = containerRef.current;
+    if (!canvas || !container) return null;
 
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
+    const rect = container.getBoundingClientRect();
+    
+    let clientX, clientY;
+    
+    if (e.touches) {
+      // Touch event
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      // Mouse event
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    // Adjust for zoom and position
+    const x = ((clientX - rect.left) / zoom) - (position.x / zoom);
+    const y = ((clientY - rect.top) / zoom) - (position.y / zoom);
+
+    return { x, y };
+  };
+
+  // Handle erase start
+  const handleEraseStart = (e) => {
+    if (!isErasing || !canvasRef.current || !fgBlob) return;
+    
+    // Prevent default to avoid scrolling
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const coords = getCoordinates(e);
+    if (!coords) return;
 
     // Add erase operation to data
     eraseDataRef.current.push({
-      x,
-      y,
+      x: coords.x,
+      y: coords.y,
       size: brushSize
     });
 
-    // Redraw canvas to show the erase
+    // Apply erase to canvas
+    const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     ctx.globalCompositeOperation = "destination-out";
     ctx.beginPath();
-    ctx.arc(x, y, brushSize, 0, Math.PI * 2);
+    ctx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalCompositeOperation = "source-over";
+    ctx.globalCompositeOperation = "source-over");
+
+    // Store last touch for continuous erasing
+    if (e.touches) {
+      lastTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
   };
 
-  // Handle mouse move for continuous erasing
-  const handleCanvasMouseMove = (e) => {
-    if (!isErasing || !e.buttons || !canvasRef.current || !fgBlob) return;
-    handleCanvasClick(e);
+  // Handle continuous erasing
+  const handleEraseMove = (e) => {
+    if (!isErasing || !canvasRef.current || !fgBlob) return;
+    
+    // Prevent default to avoid scrolling
+    e.preventDefault();
+    e.stopPropagation();
+
+    const coords = getCoordinates(e);
+    if (!coords) return;
+
+    // Add erase operation to data
+    eraseDataRef.current.push({
+      x: coords.x,
+      y: coords.y,
+      size: brushSize
+    });
+
+    // Apply erase to canvas
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.beginPath();
+    ctx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over");
+
+    // Update last touch
+    if (e.touches) {
+      lastTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  };
+
+  // Handle panning (image movement)
+  const handlePanStart = (e) => {
+    if (isErasing) return;
+    
+    e.preventDefault();
+    setIsDragging(true);
+    
+    if (e.touches) {
+      lastTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    } else {
+      lastTouchRef.current = { x: e.clientX, y: e.clientY };
+    }
+  };
+
+  const handlePanMove = (e) => {
+    if (!isDragging || isErasing) return;
+    
+    e.preventDefault();
+    
+    let clientX, clientY;
+    
+    if (e.touches) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    if (lastTouchRef.current) {
+      const deltaX = clientX - lastTouchRef.current.x;
+      const deltaY = clientY - lastTouchRef.current.y;
+      
+      setPosition(prev => ({
+        x: prev.x + deltaX,
+        y: prev.y + deltaY
+      }));
+
+      lastTouchRef.current = { x: clientX, y: clientY };
+    }
+  };
+
+  const handlePanEnd = () => {
+    setIsDragging(false);
+    lastTouchRef.current = null;
+  };
+
+  // Zoom functions
+  const zoomIn = () => {
+    setZoom(prev => Math.min(prev * 1.2, 5));
+  };
+
+  const zoomOut = () => {
+    setZoom(prev => Math.max(prev / 1.2, 0.5));
+  };
+
+  const resetView = () => {
+    setZoom(1);
+    setPosition({ x: 0, y: 0 });
   };
 
   const downloadImage = () => {
@@ -261,7 +390,7 @@ export default function RemoveBgPage() {
               <div className="flex flex-col gap-4 p-4 bg-white/30 rounded-xl border border-blue-200">
                 <label className="font-semibold text-blue-900">Manual Erase Tool:</label>
                 
-                <div className="flex gap-4 items-center">
+                <div className="flex gap-4 items-center flex-wrap">
                   <button
                     onClick={() => setIsErasing(!isErasing)}
                     className={`px-4 py-2 rounded-lg font-semibold transition-all ${
@@ -293,9 +422,44 @@ export default function RemoveBgPage() {
                   />
                 </div>
 
+                {/* Zoom Controls */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-blue-900">Zoom: {Math.round(zoom * 100)}%</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={zoomOut}
+                      className="flex-1 bg-blue-500 text-white py-2 rounded-lg font-semibold hover:bg-blue-600 transition-all"
+                    >
+                      Zoom Out
+                    </button>
+                    <button
+                      onClick={resetView}
+                      className="flex-1 bg-gray-500 text-white py-2 rounded-lg font-semibold hover:bg-gray-600 transition-all"
+                    >
+                      Reset View
+                    </button>
+                    <button
+                      onClick={zoomIn}
+                      className="flex-1 bg-blue-500 text-white py-2 rounded-lg font-semibold hover:bg-blue-600 transition-all"
+                    >
+                      Zoom In
+                    </button>
+                  </div>
+                </div>
+
                 {isErasing && (
                   <p className="text-sm text-blue-700 bg-blue-100 p-2 rounded-lg">
-                    Click and drag on the image below to erase areas
+                    {window.innerWidth < 768 
+                      ? "Touch and drag on the image to erase areas" 
+                      : "Click and drag on the image to erase areas"}
+                  </p>
+                )}
+
+                {!isErasing && (
+                  <p className="text-sm text-blue-700 bg-blue-100 p-2 rounded-lg">
+                    {window.innerWidth < 768 
+                      ? "Touch and drag to pan the image (when not erasing)" 
+                      : "Click and drag to pan the image (when not erasing)"}
                   </p>
                 )}
               </div>
@@ -314,18 +478,45 @@ export default function RemoveBgPage() {
         {fgBlob && (
           <div className="mt-10 bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-6 w-full max-w-xl flex flex-col items-center gap-4 border border-blue-200 border-opacity-30 animate-fadeIn">
             <h2 className="text-2xl md:text-3xl font-semibold text-blue-900 drop-shadow-sm">Live Preview:</h2>
-            <div className="relative">
-              <canvas 
-                ref={canvasRef} 
-                className={`rounded-2xl border-2 max-w-full shadow-md ${
-                  isErasing ? 'cursor-crosshair border-red-400' : 'border-blue-300'
-                }`}
-                onClick={handleCanvasClick}
-                onMouseMove={handleCanvasMouseMove}
-              />
+            <div 
+              ref={containerRef}
+              className="relative overflow-hidden rounded-2xl border-2 max-w-full shadow-md bg-gray-100"
+              style={{ 
+                cursor: isErasing ? 'crosshair' : isDragging ? 'grabbing' : 'grab',
+                touchAction: 'none' // This prevents browser handling of touch gestures
+              }}
+            >
+              <div
+                style={{
+                  transform: `scale(${zoom}) translate(${position.x}px, ${position.y}px)`,
+                  transformOrigin: '0 0',
+                  width: '100%',
+                  height: '100%'
+                }}
+              >
+                <canvas 
+                  ref={canvasRef} 
+                  className={`block ${isErasing ? 'border-red-400' : 'border-blue-300'}`}
+                  // Mouse events
+                  onMouseDown={isErasing ? handleEraseStart : handlePanStart}
+                  onMouseMove={isErasing ? handleEraseMove : handlePanMove}
+                  onMouseUp={handlePanEnd}
+                  onMouseLeave={handlePanEnd}
+                  // Touch events
+                  onTouchStart={isErasing ? handleEraseStart : handlePanStart}
+                  onTouchMove={isErasing ? handleEraseMove : handlePanMove}
+                  onTouchEnd={handlePanEnd}
+                  onTouchCancel={handlePanEnd}
+                />
+              </div>
               {isErasing && (
                 <div className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-semibold animate-pulse">
                   Erase Mode Active
+                </div>
+              )}
+              {zoom !== 1 && (
+                <div className="absolute top-2 left-2 bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                  Zoom: {Math.round(zoom * 100)}%
                 </div>
               )}
             </div>

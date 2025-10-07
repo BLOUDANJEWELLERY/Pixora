@@ -3,15 +3,15 @@ import { removeBackground } from "@imgly/background-removal";
 import Header from "../components/Header";
 
 export default function RemoveBgPage() {
-  const [inputImage, setInputImage] = useState(null);
-  const [fgBlob, setFgBlob] = useState(null);
+  const [inputImage, setInputImage] = useState<File | null>(null);
+  const [fgBlob, setFgBlob] = useState<Blob | null>(null);
   const [bgOption, setBgOption] = useState("transparent");
   const [bgColor, setBgColor] = useState("#ffffff");
-  const [bgFile, setBgFile] = useState(null);
+  const [bgFile, setBgFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const canvasRef = useRef(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Live preview redraw
   useEffect(() => {
@@ -21,9 +21,16 @@ export default function RemoveBgPage() {
       try {
         const fgBitmap = await createImageBitmap(fgBlob);
         const canvas = canvasRef.current;
+        const ctx = canvas.getContext("2d");
+        
+        if (!ctx) {
+          setError("Failed to get canvas context");
+          return;
+        }
+
+        // Set canvas dimensions
         canvas.width = fgBitmap.width;
         canvas.height = fgBitmap.height;
-        const ctx = canvas.getContext("2d");
 
         // Clear canvas first
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -34,22 +41,24 @@ export default function RemoveBgPage() {
           ctx.fillRect(0, 0, canvas.width, canvas.height);
         } else if (bgOption === "image" && bgFile) {
           const bgBitmap = await createImageBitmap(bgFile);
+          // Scale background to fit canvas
           ctx.drawImage(bgBitmap, 0, 0, canvas.width, canvas.height);
         }
         // For transparent, we just clear the canvas (already done above)
 
+        // Draw foreground image
         ctx.drawImage(fgBitmap, 0, 0);
       } catch (err) {
         console.error("Error drawing preview:", err);
-        setError("Failed to draw preview: " + err.message);
+        setError("Failed to draw preview: " + (err as Error).message);
       }
     };
 
     drawPreview();
   }, [fgBlob, bgOption, bgColor, bgFile]);
 
-  const handleInputChange = (e) => {
-    const file = e.target.files[0];
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
       setInputImage(file);
       setFgBlob(null);
@@ -60,7 +69,10 @@ export default function RemoveBgPage() {
   };
 
   const processImage = async () => {
-    if (!inputImage) return alert("Please upload an image");
+    if (!inputImage) {
+      alert("Please upload an image");
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -70,9 +82,9 @@ export default function RemoveBgPage() {
       
       // Configure the background removal with proper options
       const config = {
-        publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal@latest/dist/", // Ensure models are loaded
-        debug: true, // Enable debug mode to see what's happening
-        progress: (key, current, total) => {
+        publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal@latest/dist/",
+        debug: true,
+        progress: (key: string, current: number, total: number) => {
           console.log(`Downloading ${key}: ${current} of ${total}`);
         }
       };
@@ -83,15 +95,15 @@ export default function RemoveBgPage() {
       setFgBlob(blob);
     } catch (err) {
       console.error("Background removal error:", err);
-      setError("Failed to process image: " + (err.message || "Unknown error"));
+      setError("Failed to process image: " + ((err as Error).message || "Unknown error"));
       alert("Failed to process image. Check console for details.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleBgFileChange = (e) => {
-    const file = e.target.files[0];
+  const handleBgFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) setBgFile(file);
   };
 
@@ -100,16 +112,22 @@ export default function RemoveBgPage() {
     
     try {
       canvasRef.current.toBlob((blob) => {
+        if (!blob) {
+          setError("Failed to create image blob");
+          return;
+        }
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
         a.download = "background-removed.png";
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }, "image/png");
     } catch (err) {
       console.error("Download error:", err);
-      setError("Failed to download image: " + err.message);
+      setError("Failed to download image: " + (err as Error).message);
     }
   };
 

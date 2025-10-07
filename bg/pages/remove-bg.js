@@ -194,7 +194,7 @@ export default function RemoveBgPage() {
     ctx.beginPath();
     ctx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalCompositeOperation = "source-over");
+    ctx.globalCompositeOperation = "source-over";
 
     // Update last touch
     if (e.touches) {

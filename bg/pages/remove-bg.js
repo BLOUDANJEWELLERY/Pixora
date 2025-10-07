@@ -1,3 +1,4 @@
+import Header from "../components/Header";
 import { useState, useRef, useEffect } from "react";
 import { removeBackground } from "@imgly/background-removal";
 
@@ -81,6 +82,8 @@ export default function RemoveBgPage() {
   };
 
   return (
+    <>
+    <Header />
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6 animate-fadeIn">
       <h1 className="text-4xl md:text-5xl font-extrabold text-blue-900 mb-10 text-center drop-shadow-lg tracking-wide animate-fadeIn">
         Background Remover & Replacer
@@ -177,5 +180,6 @@ export default function RemoveBgPage() {
         }
       `}</style>
     </div>
+    </>
   );
 }

@@ -4,26 +4,29 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { createBackgroundRemoval } from "@imgly/background-removal";
 import Header from "../components/Header";
 
+// 🧩 Define proper type for the background removal function
+type BackgroundRemover = (options: { image: File | Blob | string }) => Promise<Blob>;
+
 export default function RemoveBgPage() {
   const [inputImage, setInputImage] = useState<File | null>(null);
   const [fgBlob, setFgBlob] = useState<Blob | null>(null);
-  const [bgOption, setBgOption] = useState("transparent");
-  const [bgColor, setBgColor] = useState("#ffffff");
+  const [bgOption, setBgOption] = useState<"transparent" | "color" | "image">("transparent");
+  const [bgColor, setBgColor] = useState<string>("#ffffff");
   const [bgFile, setBgFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // 🧠 Preload and cache background removal model once
-  const backgroundRemover = useMemo(() => {
+  const backgroundRemover = useMemo<BackgroundRemover | null>(() => {
     if (typeof window === "undefined") return null;
-    return createBackgroundRemoval(); // internally caches WASM + model
+    return createBackgroundRemoval();
   }, []);
 
   // 🖼️ Redraw preview whenever fg/bg changes
   useEffect(() => {
-    const drawPreview = async () => {
+    const drawPreview = async (): Promise<void> => {
       if (!fgBlob || !canvasRef.current) return;
 
       const fgBitmap = await createImageBitmap(fgBlob);
@@ -50,24 +53,29 @@ export default function RemoveBgPage() {
     };
 
     drawPreview();
-  }, [fgBlob, bgOption, bgColor, bgFile]);
+  }, [fgBlob, bgOption, bgColor, bgFile, canvasRef]);
 
   // 🧾 File input handler
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setInputImage(file);
-      setFgBlob(null);
-      setBgFile(null);
-      setBgOption("transparent");
-      setError(null);
-    }
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0] ?? null;
+    setInputImage(file);
+    setFgBlob(null);
+    setBgFile(null);
+    setBgOption("transparent");
+    setError(null);
   };
 
   // ⚙️ Process image with cached model
-  const processImage = async () => {
-    if (!inputImage) return alert("Please upload an image first.");
-    if (!backgroundRemover) return alert("Background remover not ready yet.");
+  const processImage = async (): Promise<void> => {
+    if (!inputImage) {
+      alert("Please upload an image first.");
+      return;
+    }
+
+    if (!backgroundRemover) {
+      alert("Background remover not ready yet.");
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -75,7 +83,7 @@ export default function RemoveBgPage() {
     try {
       const blob = await backgroundRemover({ image: inputImage });
       setFgBlob(blob);
-    } catch (err: any) {
+    } catch (err) {
       console.error("❌ Background removal failed:", err);
       setError("Failed to process image. Please try again.");
     } finally {
@@ -84,15 +92,17 @@ export default function RemoveBgPage() {
   };
 
   // 🌆 Background file handler
-  const handleBgFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setBgFile(file);
+  const handleBgFileChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0] ?? null;
+    setBgFile(file);
   };
 
   // 💾 Download final composite
-  const downloadImage = () => {
-    if (!canvasRef.current) return;
-    canvasRef.current.toBlob((blob) => {
+  const downloadImage = (): void => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    canvas.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -144,7 +154,7 @@ export default function RemoveBgPage() {
                 <label className="font-semibold text-blue-900">Background Option:</label>
                 <select
                   value={bgOption}
-                  onChange={(e) => setBgOption(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setBgOption(e.target.value as "transparent" | "color" | "image")}
                   className="p-2 border rounded-lg border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/60"
                 >
                   <option value="transparent">Transparent</option>
@@ -159,7 +169,7 @@ export default function RemoveBgPage() {
                   <input
                     type="color"
                     value={bgColor}
-                    onChange={(e) => setBgColor(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBgColor(e.target.value)}
                     className="w-20 h-10 border rounded-lg cursor-pointer border-blue-300"
                   />
                 </div>
@@ -195,7 +205,6 @@ export default function RemoveBgPage() {
           </div>
         )}
 
-        {/* Animation */}
         <style jsx>{`
           @keyframes fadeIn {
             0% { opacity: 0; transform: translateY(10px); }

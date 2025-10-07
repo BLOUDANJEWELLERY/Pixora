@@ -161,7 +161,7 @@ export default function RemoveBgPage() {
     ctx.beginPath();
     ctx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalCompositeOperation = "source-over");
+    ctx.globalCompositeOperation = "source-over";
 
     // Store last touch for continuous erasing
     if (e.touches) {

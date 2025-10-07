@@ -1,60 +1,55 @@
-"use client";
-
-import { useState, useRef, useEffect, useMemo } from "react";
-import removeBackground from "@imgly/background-removal";
+import { useState, useRef, useEffect } from "react";
+import { removeBackground } from "@imgly/background-removal";
 import Header from "../components/Header";
 
 export default function RemoveBgPage() {
-  const [inputImage, setInputImage] = useState<File | null>(null);
-  const [fgBlob, setFgBlob] = useState<Blob | null>(null);
+  const [inputImage, setInputImage] = useState(null);
+  const [fgBlob, setFgBlob] = useState(null);
   const [bgOption, setBgOption] = useState("transparent");
   const [bgColor, setBgColor] = useState("#ffffff");
-  const [bgFile, setBgFile] = useState<File | null>(null);
+  const [bgFile, setBgFile] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
 
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasRef = useRef(null);
 
-  // 🧠 Preload and cache background removal model once
-  const backgroundRemover = useMemo(() => {
-    if (typeof window === "undefined") return null;
-    return createBackgroundRemoval(); // internally caches WASM + model
-  }, []);
-
-  // 🖼️ Redraw preview whenever fg/bg changes
+  // Live preview redraw
   useEffect(() => {
     const drawPreview = async () => {
       if (!fgBlob || !canvasRef.current) return;
 
-      const fgBitmap = await createImageBitmap(fgBlob);
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      try {
+        const fgBitmap = await createImageBitmap(fgBlob);
+        const canvas = canvasRef.current;
+        canvas.width = fgBitmap.width;
+        canvas.height = fgBitmap.height;
+        const ctx = canvas.getContext("2d");
 
-      canvas.width = fgBitmap.width;
-      canvas.height = fgBitmap.height;
-
-      // Draw background
-      if (bgOption === "color") {
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      } else if (bgOption === "image" && bgFile) {
-        const bgBitmap = await createImageBitmap(bgFile);
-        ctx.drawImage(bgBitmap, 0, 0, canvas.width, canvas.height);
-      } else {
+        // Clear canvas first
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
 
-      // Draw foreground
-      ctx.drawImage(fgBitmap, 0, 0);
+        // Draw background
+        if (bgOption === "color") {
+          ctx.fillStyle = bgColor;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        } else if (bgOption === "image" && bgFile) {
+          const bgBitmap = await createImageBitmap(bgFile);
+          ctx.drawImage(bgBitmap, 0, 0, canvas.width, canvas.height);
+        }
+        // For transparent, we just clear the canvas (already done above)
+
+        ctx.drawImage(fgBitmap, 0, 0);
+      } catch (err) {
+        console.error("Error drawing preview:", err);
+        setError("Failed to draw preview: " + err.message);
+      }
     };
 
     drawPreview();
   }, [fgBlob, bgOption, bgColor, bgFile]);
 
-  // 🧾 File input handler
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleInputChange = (e) => {
+    const file = e.target.files[0];
     if (file) {
       setInputImage(file);
       setFgBlob(null);
@@ -64,45 +59,58 @@ export default function RemoveBgPage() {
     }
   };
 
-  // ⚙️ Process image with cached model
-const processImage = async (): Promise<void> => {
-  if (!inputImage) {
-    alert("Please upload an image first.");
-    return;
-  }
+  const processImage = async () => {
+    if (!inputImage) return alert("Please upload an image");
 
-  setLoading(true);
-  setError(null);
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log("Starting background removal...");
+      
+      // Configure the background removal with proper options
+      const config = {
+        publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal@latest/dist/", // Ensure models are loaded
+        debug: true, // Enable debug mode to see what's happening
+        progress: (key, current, total) => {
+          console.log(`Downloading ${key}: ${current} of ${total}`);
+        }
+      };
 
-  try {
-    const blob = await backgroundRemover({ image: inputImage });
-    setFgBlob(blob);
-  } catch (err) {
-    console.error("❌ Background removal failed:", err);
-    setError("Failed to process image. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
+      const blob = await removeBackground(inputImage, config);
+      console.log("Background removal successful, blob:", blob);
+      
+      setFgBlob(blob);
+    } catch (err) {
+      console.error("Background removal error:", err);
+      setError("Failed to process image: " + (err.message || "Unknown error"));
+      alert("Failed to process image. Check console for details.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // 🌆 Background file handler
-  const handleBgFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleBgFileChange = (e) => {
+    const file = e.target.files[0];
     if (file) setBgFile(file);
   };
 
-  // 💾 Download final composite
   const downloadImage = () => {
     if (!canvasRef.current) return;
-    canvasRef.current.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "output.png";
-      a.click();
-      URL.revokeObjectURL(url);
-    }, "image/png");
+    
+    try {
+      canvasRef.current.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "background-removed.png";
+        a.click();
+        URL.revokeObjectURL(url);
+      }, "image/png");
+    } catch (err) {
+      console.error("Download error:", err);
+      setError("Failed to download image: " + err.message);
+    }
   };
 
   return (
@@ -113,8 +121,16 @@ const processImage = async (): Promise<void> => {
           Background Remover & Replacer
         </h1>
 
-        {/* Upload Card */}
+        {/* Glassmorphic Upload Card */}
         <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30 transition-transform transform hover:scale-[1.02] duration-300">
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+              <strong className="font-bold">Error: </strong>
+              <span className="block sm:inline">{error}</span>
+            </div>
+          )}
+
           <div className="flex flex-col">
             <label className="mb-2 font-semibold text-blue-900">Upload Image:</label>
             <input
@@ -125,21 +141,33 @@ const processImage = async (): Promise<void> => {
             />
           </div>
 
+          {inputImage && (
+            <div className="text-sm text-blue-700">
+              Selected: {inputImage.name} ({(inputImage.size / 1024 / 1024).toFixed(2)} MB)
+            </div>
+          )}
+
           {!fgBlob && inputImage && (
             <button
               onClick={processImage}
               disabled={loading}
               className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-bold py-3 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Processing..." : "Process Image"}
+              {loading ? (
+                <div className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Processing...
+                </div>
+              ) : (
+                "Remove Background"
+              )}
             </button>
           )}
 
-          {error && (
-            <p className="text-red-600 font-medium text-center">{error}</p>
-          )}
-
-          {/* Background options after processing */}
+          {/* Show background options only after processing */}
           {fgBlob && (
             <>
               <div className="flex flex-col gap-2">
@@ -181,7 +209,7 @@ const processImage = async (): Promise<void> => {
 
               <button
                 onClick={downloadImage}
-                className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-bold py-3 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] mt-4"
+                className="relative overflow-hidden bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800 text-white font-bold py-3 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(34,197,94,0.5)] mt-4"
               >
                 Download Image
               </button>
@@ -189,15 +217,19 @@ const processImage = async (): Promise<void> => {
           )}
         </div>
 
-        {/* Live Preview */}
+        {/* Preview Card */}
         {fgBlob && (
           <div className="mt-10 bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-6 w-full max-w-xl flex flex-col items-center gap-4 border border-blue-200 border-opacity-30 animate-fadeIn">
             <h2 className="text-2xl md:text-3xl font-semibold text-blue-900 drop-shadow-sm">Live Preview:</h2>
-            <canvas ref={canvasRef} className="rounded-2xl border border-blue-300 max-w-full shadow-md" />
+            <canvas 
+              ref={canvasRef} 
+              className="rounded-2xl border border-blue-300 max-w-full shadow-md bg-gray-100" 
+              style={{ maxHeight: '500px' }}
+            />
           </div>
         )}
 
-        {/* Animation */}
+        {/* Fade-in Animation */}
         <style jsx>{`
           @keyframes fadeIn {
             0% { opacity: 0; transform: translateY(10px); }

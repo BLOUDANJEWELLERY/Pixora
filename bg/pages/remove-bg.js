@@ -1,3 +1,4 @@
+import Header from "../components/Header";
 import { useState, useRef, useEffect } from "react";
 import { removeBackground } from "@imgly/background-removal";
 

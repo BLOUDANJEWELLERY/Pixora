@@ -21,8 +21,8 @@ export default function RemoveBgPage() {
   const originalFgBitmapRef = useRef(null);
   const eraseDataRef = useRef([]);
   const lastTouchRef = useRef(null);
-  const foregroundCanvasRef = useRef(null); // Separate canvas for foreground only
-  const backgroundBitmapRef = useRef(null); // Store background image bitmap
+  const foregroundCanvasRef = useRef(null);
+  const backgroundBitmapRef = useRef(null);
 
   // Initialize foreground canvas and load background image
   useEffect(() => {
@@ -122,7 +122,7 @@ export default function RemoveBgPage() {
     try {
       const blob = await removeBackground(inputImage);
       setFgBlob(blob);
-      eraseDataRef.current = []; // Reset erase data
+      eraseDataRef.current = [];
       setZoom(1);
       setPosition({ x: 0, y: 0 });
     } catch (err) {
@@ -149,11 +149,9 @@ export default function RemoveBgPage() {
     let clientX, clientY;
     
     if (e.touches) {
-      // Touch event
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
     } else {
-      // Mouse event
       clientX = e.clientX;
       clientY = e.clientY;
     }
@@ -165,9 +163,13 @@ export default function RemoveBgPage() {
       visible: true
     });
 
-    // Adjust for zoom and position to get actual image coordinates
-    const x = ((clientX - rect.left) / zoom) - (position.x / zoom);
-    const y = ((clientY - rect.top) / zoom) - (position.y / zoom);
+    // Calculate the actual image coordinates without zoom/position adjustments
+    // This is the key fix - we need to account for the actual canvas size vs display size
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
 
     return { x, y };
   };
@@ -204,7 +206,6 @@ export default function RemoveBgPage() {
   const handleEraseStart = (e) => {
     if (!isErasing || !canvasRef.current || !fgBlob || !foregroundCanvasRef.current) return;
     
-    // Prevent default to avoid scrolling
     e.preventDefault();
     e.stopPropagation();
     
@@ -230,7 +231,6 @@ export default function RemoveBgPage() {
     // Redraw the main canvas with updated foreground
     redrawMainCanvas();
 
-    // Store last touch for continuous erasing
     if (e.touches) {
       lastTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     }
@@ -240,7 +240,6 @@ export default function RemoveBgPage() {
   const handleEraseMove = (e) => {
     if (!isErasing || !canvasRef.current || !fgBlob || !foregroundCanvasRef.current) return;
     
-    // Prevent default to avoid scrolling
     e.preventDefault();
     e.stopPropagation();
 
@@ -261,12 +260,11 @@ export default function RemoveBgPage() {
     fgCtx.beginPath();
     fgCtx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
     fgCtx.fill();
-    fgCtx.globalCompositeOperation = "source-over";
+    fgCtx.globalCompositeOperation = "source-over");
 
     // Redraw the main canvas with updated foreground
     redrawMainCanvas();
 
-    // Update last touch
     if (e.touches) {
       lastTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     }
@@ -290,7 +288,6 @@ export default function RemoveBgPage() {
     } else if (bgOption === "image" && backgroundBitmapRef.current) {
       ctx.drawImage(backgroundBitmapRef.current, 0, 0, canvas.width, canvas.height);
     }
-    // For transparent background, we don't draw anything
 
     // Draw foreground canvas (with erasures) onto main canvas
     ctx.drawImage(fgCanvas, 0, 0);
@@ -360,29 +357,22 @@ export default function RemoveBgPage() {
   const downloadImage = async () => {
     if (!canvasRef.current || !originalFgBitmapRef.current || !foregroundCanvasRef.current) return;
     
-    // Create a temporary canvas for the final output
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
     tempCanvas.width = originalFgBitmapRef.current.width;
     tempCanvas.height = originalFgBitmapRef.current.height;
 
-    // Clear the temporary canvas
     tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
 
-    // Draw background first (this should NOT be affected by erase operations)
     if (bgOption === "color") {
       tempCtx.fillStyle = bgColor;
       tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
     } else if (bgOption === "image" && backgroundBitmapRef.current) {
       tempCtx.drawImage(backgroundBitmapRef.current, 0, 0, tempCanvas.width, tempCanvas.height);
     }
-    // For transparent background, we don't draw anything
 
-    // Draw the foreground canvas (which already has the erase operations applied)
-    // This will show the background through the erased areas
     tempCtx.drawImage(foregroundCanvasRef.current, 0, 0);
 
-    // Download the image
     tempCanvas.toBlob((blob) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -399,11 +389,9 @@ export default function RemoveBgPage() {
       const fgCanvas = foregroundCanvasRef.current;
       const fgCtx = fgCanvas.getContext("2d");
       
-      // Reset foreground canvas to the original image
       fgCtx.clearRect(0, 0, fgCanvas.width, fgCanvas.height);
       fgCtx.drawImage(originalFgBitmapRef.current, 0, 0);
       
-      // Redraw main canvas
       redrawMainCanvas();
     }
   };
@@ -416,7 +404,6 @@ export default function RemoveBgPage() {
           Background Remover & Replacer
         </h1>
 
-        {/* Glassmorphic Upload Card */}
         <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6 border border-blue-200 border-opacity-30 transition-transform transform hover:scale-[1.02] duration-300">
           <div className="flex flex-col">
             <label className="mb-2 font-semibold text-blue-900">Upload Image:</label>
@@ -438,7 +425,6 @@ export default function RemoveBgPage() {
             </button>
           )}
 
-          {/* Show background options and erase tools only after processing */}
           {fgBlob && (
             <>
               <div className="flex flex-col gap-2">
@@ -478,7 +464,6 @@ export default function RemoveBgPage() {
                 </div>
               )}
 
-              {/* Erase Tools */}
               <div className="flex flex-col gap-4 p-4 bg-white/30 rounded-xl border border-blue-200">
                 <label className="font-semibold text-blue-900">Manual Erase Tool:</label>
                 
@@ -514,7 +499,6 @@ export default function RemoveBgPage() {
                   />
                 </div>
 
-                {/* Zoom Controls */}
                 <div className="flex flex-col gap-2">
                   <label className="text-blue-900">Zoom: {Math.round(zoom * 100)}%</label>
                   <div className="flex gap-2">
@@ -566,7 +550,6 @@ export default function RemoveBgPage() {
           )}
         </div>
 
-        {/* Preview Card */}
         {fgBlob && (
           <div className="mt-10 bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-6 w-full max-w-xl flex flex-col items-center gap-4 border border-blue-200 border-opacity-30 animate-fadeIn">
             <h2 className="text-2xl md:text-3xl font-semibold text-blue-900 drop-shadow-sm">Live Preview:</h2>
@@ -575,7 +558,7 @@ export default function RemoveBgPage() {
               className="relative overflow-hidden rounded-2xl border-2 max-w-full shadow-md bg-gray-100"
               style={{ 
                 cursor: isErasing ? 'crosshair' : isDragging ? 'grabbing' : 'grab',
-                touchAction: 'none' // This prevents browser handling of touch gestures
+                touchAction: 'none'
               }}
               onMouseMove={handleCursorMove}
               onMouseLeave={handleCursorLeave}
@@ -592,7 +575,6 @@ export default function RemoveBgPage() {
                 <canvas 
                   ref={canvasRef} 
                   className={`block ${isErasing ? 'border-red-400' : 'border-blue-300'}`}
-                  // Mouse events
                   onMouseDown={isErasing ? handleEraseStart : handlePanStart}
                   onMouseMove={(e) => {
                     handleCursorMove(e);
@@ -604,7 +586,6 @@ export default function RemoveBgPage() {
                     handlePanEnd();
                     handleCursorLeave();
                   }}
-                  // Touch events
                   onTouchStart={isErasing ? handleEraseStart : handlePanStart}
                   onTouchMove={(e) => {
                     handleCursorMove(e);
@@ -616,15 +597,14 @@ export default function RemoveBgPage() {
                 />
               </div>
 
-              {/* Brush Preview - Now matches actual erase size exactly */}
               {isErasing && cursorPosition.visible && (
                 <div 
                   className="absolute pointer-events-none rounded-full"
                   style={{
-                    left: cursorPosition.x - brushSize + 10 * zoom / 2,
-                    top: cursorPosition.y - brushSize + 10 * zoom / 2,
-                    width: `${brushSize * zoom + 10}px`,
-                    height: `${brushSize * zoom + 10}px`,
+                    left: cursorPosition.x - (brushSize * zoom) / 2,
+                    top: cursorPosition.y - (brushSize * zoom) / 2,
+                    width: `${brushSize * zoom}px`,
+                    height: `${brushSize * zoom}px`,
                     border: '2px solid red',
                     backgroundColor: 'rgba(255, 0, 0, 0.2)',
                     boxShadow: '0 0 0 1px white'
@@ -646,7 +626,6 @@ export default function RemoveBgPage() {
           </div>
         )}
 
-        {/* Fade-in Animation */}
         <style jsx>{`
           @keyframes fadeIn {
             0% { opacity: 0; transform: translateY(10px); }

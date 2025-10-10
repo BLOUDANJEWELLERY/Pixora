@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Live Gold Rate</title>
   <style>
     body {
-      font-family: 'Poppins', sans-serif;
+      font-family: "Poppins", sans-serif;
       background: #faf9f6;
       color: #3a2c17;
       text-align: center;
       padding: 40px;
     }
     .container {
-      max-width: 400px;
+      max-width: 420px;
       margin: 60px auto;
       background: white;
       border-radius: 12px;
@@ -22,10 +22,16 @@
     }
     h1 {
       color: #b8860b;
+      margin-bottom: 10px;
     }
     .rate {
-      font-size: 2em;
+      font-size: 1.8em;
       margin: 20px 0;
+      color: #4a3721;
+    }
+    .sub {
+      color: #8b7d6b;
+      margin-bottom: 20px;
     }
     button {
       background: #b8860b;
@@ -44,31 +50,36 @@
 <body>
   <div class="container">
     <h1>Live Gold Rate</h1>
-    <div id="goldRate" class="rate">Loading...</div>
-    <p id="time"></p>
+    <div id="usdRate" class="rate">Loading...</div>
+    <div id="kwdRate" class="sub"></div>
+    <p id="time" class="sub"></p>
     <button onclick="fetchGoldRate()">Refresh</button>
   </div>
 
   <script>
-    const API_KEY = "YOUR_API_KEY"; // from metals-api.com
-    const API_URL = `https://metals-api.com/api/latest?access_key=${API_KEY}&base=USD&symbols=XAU`;
-
     async function fetchGoldRate() {
+      const url = "https://query1.finance.yahoo.com/v8/finance/chart/XAUUSD=X";
       try {
-        const res = await fetch(API_URL);
-        const data = await res.json();
-        const rate = data.rates.XAU;
-        const goldRate = (1 / rate).toFixed(2); // USD per gram (approx)
-        document.getElementById("goldRate").innerText = `$${goldRate} / gram`;
-        document.getElementById("time").innerText = "Last updated: " + new Date().toLocaleTimeString();
+        const response = await fetch(url);
+        const data = await response.json();
+        const pricePerOunce = data.chart.result[0].meta.regularMarketPrice;
+        
+        const pricePerGramUSD = pricePerOunce / 31.1035; // 1 oz = 31.1035 g
+        const usdToKwd = 0.31; // Approximate conversion rate
+        const pricePerGramKWD = pricePerGramUSD * usdToKwd;
+
+        document.getElementById("usdRate").innerText = `$${pricePerGramUSD.toFixed(2)} / gram`;
+        document.getElementById("kwdRate").innerText = `${pricePerGramKWD.toFixed(3)} KWD / gram`;
+
+        document.getElementById("time").innerText = "Updated: " + new Date().toLocaleTimeString();
       } catch (error) {
-        document.getElementById("goldRate").innerText = "Error loading rate";
+        document.getElementById("usdRate").innerText = "Error fetching data.";
         console.error(error);
       }
     }
 
     fetchGoldRate();
-    setInterval(fetchGoldRate, 60000); // auto-refresh every 1 minute
+    setInterval(fetchGoldRate, 60000); // auto-refresh every 1 min
   </script>
 </body>
 </html>

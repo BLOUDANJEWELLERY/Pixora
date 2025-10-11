@@ -174,7 +174,7 @@ const YouTubeDownloader = () => {
             </h3>
             <div className="mt-2 text-sm text-yellow-700">
               <p>
-                This tool is for personal use only. Please respect copyright laws and YouTube's Terms of Service. 
+                This tool is for personal use only. Please respect copyright laws and YouTubes Terms of Service. 
                 Only download videos you have permission to use.
               </p>
             </div>

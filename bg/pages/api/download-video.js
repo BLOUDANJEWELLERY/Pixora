@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { url, title } = req.body;
+  const { url, quality, title } = req.body; // Added 'quality'
 
   if (!url || !ytdl.validateURL(url)) {
     return res.status(400).json({ error: 'A valid YouTube URL is required' });
@@ -14,39 +14,45 @@ export default async function handler(req, res) {
 
   try {
     const videoInfo = await ytdl.getInfo(url);
-    // Sanitize the title for the filename
+
     const sanitizedTitle = (title || videoInfo.videoDetails.title)
-      .replace(/[^a-zA-Z0-9\s]/g, '_') // Replace non-alphanumeric characters with underscores
-      .replace(/\s+/g, '_'); // Replace spaces with underscores
+      .replace(/[^a-zA-Z0-9\s]/g, '_')
+      .replace(/\s+/g, '_');
+      
+    // If a specific quality is requested, find the corresponding format
+    const format = ytdl.filterFormats(videoInfo.formats, (f) => {
+      return f.qualityLabel === quality && f.hasVideo && f.hasAudio;
+    }).sort((a,b) => b.contentLength - a.contentLength)[0]; // Get the best matching format for that quality
 
-    const filename = `${sanitizedTitle}.mp4`;
+    if (!format) {
+      return res.status(404).json({ error: `No suitable format found for quality: ${quality}` });
+    }
 
-    // Set the response headers to trigger a download
+    const filename = `${sanitizedTitle}_${quality}.mp4`;
+
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'video/mp4');
 
-    // Stream the video directly to the response
     const downloadStream = ytdl(url, {
-      quality: 'highest',
-      filter: 'videoandaudio',
+      format: format, // Use the specific format found
     });
 
-    // Pipe the download stream to the response
     downloadStream.pipe(res);
 
-    // Handle potential errors during the stream
     downloadStream.on('error', (error) => {
       console.error('Stream error:', error);
       if (!res.headersSent) {
-        res.status(500).json({ error: 'Failed to download the video.' });
+        res.status(500).json({ error: 'Failed to download the video stream.' });
       }
     });
 
   } catch (error) {
-    console.error('Error fetching video info:', error);
-    res.status(500).json({
-      error: 'An error occurred while trying to download the video.',
-      details: error.message,
-    });
+    console.error('Error during video download:', error);
+    if (!res.headersSent) {
+        res.status(500).json({
+          error: 'An error occurred while trying to download the video.',
+          details: error.message,
+        });
+    }
   }
 }

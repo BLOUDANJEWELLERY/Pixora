@@ -6,7 +6,7 @@ export default function DownloadPage() {
   const handleDownload = () => {
     if (!url) return alert('Enter a YouTube URL');
     
-    const PUPPETEER_SERVER = 'https://gold-rate-vt9u.onrender.com';
+    const PUPPETEER_SERVER = 'https://gold-rate-lm4o.onrender.com';
 
     window.open(`${PUPPETEER_SERVER}/download?url=${encodeURIComponent(url)}`, '_blank');
   };

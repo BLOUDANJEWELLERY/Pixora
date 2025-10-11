@@ -1,4 +1,5 @@
 import axios from 'axios';
+import ytdl from 'ytdl-core';
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -34,26 +35,37 @@ export default async function handler(req, res) {
 
     console.log('Extracted video ID:', videoId);
 
-    // Use YouTube oEmbed API to get basic video info
-    const oEmbedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
-    
-    const [oEmbedResponse, thumbnails] = await Promise.all([
-      axios.get(oEmbedUrl).catch(() => null),
-      getVideoThumbnails(videoId)
-    ]);
+    // Convert to standard URL for ytdl-core
+    const standardUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-    if (!oEmbedResponse) {
+    // Use YouTube oEmbed API to get basic video info
+    const oEmbedUrl = `https://www.youtube.com/oembed?url=${standardUrl}&format=json`;
+    
+    let oEmbedResponse;
+    try {
+      oEmbedResponse = await axios.get(oEmbedUrl);
+    } catch (error) {
       return res.status(400).json({ 
         error: 'Video not found or unavailable. It might be private, deleted, or age-restricted.' 
       });
     }
 
+    // Get available formats using ytdl-core
+    let formats = [];
+    try {
+      const info = await ytdl.getInfo(standardUrl);
+      formats = getAvailableFormats(info.formats);
+    } catch (error) {
+      console.log('Could not get formats with ytdl-core, using default formats');
+      formats = getDefaultFormats();
+    }
+
     const videoInfo = {
       title: oEmbedResponse.data.title,
       author: oEmbedResponse.data.author_name,
-      thumbnail: thumbnails.high || thumbnails.medium || oEmbedResponse.data.thumbnail_url,
+      thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
       videoId: videoId,
-      formats: generateDownloadOptions(videoId)
+      formats: formats
     };
 
     res.status(200).json(videoInfo);
@@ -95,20 +107,58 @@ function extractVideoId(url) {
   return null;
 }
 
-async function getVideoThumbnails(videoId) {
-  const qualities = ['maxresdefault', 'sddefault', 'hqdefault', 'mqdefault', 'default'];
-  const thumbnails = {};
+function getAvailableFormats(formats) {
+  const availableFormats = [];
+  const qualityMap = new Map();
 
-  // Return thumbnail URLs for different qualities
-  return {
-    high: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-    medium: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-    low: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`
-  };
+  // Look for formats with both video and audio
+  formats.forEach(format => {
+    if (format.hasVideo && format.hasAudio && format.container === 'mp4') {
+      const quality = format.qualityLabel || 'Unknown';
+      if (!qualityMap.has(quality) || format.bitrate > (qualityMap.get(quality)?.bitrate || 0)) {
+        qualityMap.set(quality, {
+          quality: quality,
+          label: `${quality} (Recommended)`,
+          itag: format.itag,
+          type: 'mp4',
+          container: format.container,
+          bitrate: format.bitrate
+        });
+      }
+    }
+  });
+
+  // If no combined formats, look for separate video and audio
+  if (qualityMap.size === 0) {
+    formats.forEach(format => {
+      if (format.hasVideo && format.container === 'mp4') {
+        const quality = format.qualityLabel || 'Video';
+        if (!qualityMap.has(quality)) {
+          qualityMap.set(quality, {
+            quality: quality,
+            label: `${quality} (Video only)`,
+            itag: format.itag,
+            type: 'mp4',
+            container: format.container,
+            hasVideo: true,
+            hasAudio: false
+          });
+        }
+      }
+    });
+  }
+
+  // Convert to array and sort by quality
+  return Array.from(qualityMap.values())
+    .sort((a, b) => {
+      const qualityA = parseInt(a.quality) || 0;
+      const qualityB = parseInt(b.quality) || 0;
+      return qualityB - qualityA;
+    });
 }
 
-function generateDownloadOptions(videoId) {
-  // These are common quality options for YouTube videos
+function getDefaultFormats() {
+  // Fallback formats if ytdl-core fails
   return [
     {
       quality: '1080p',
@@ -135,13 +185,6 @@ function generateDownloadOptions(videoId) {
       quality: '360p',
       label: 'Medium (360p)',
       itag: '18',
-      type: 'mp4',
-      container: 'mp4'
-    },
-    {
-      quality: '240p',
-      label: 'Low (240p)',
-      itag: '133',
       type: 'mp4',
       container: 'mp4'
     }

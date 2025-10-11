@@ -62,53 +62,71 @@ const YouTubeDownloader = () => {
     }
   };
 
-  const downloadVideo = async (format) => {
-    if (!videoInfo || downloading) return;
+const downloadVideo = async (format) => {
+  if (!videoInfo || downloading) return;
 
-    setDownloading(true);
-    setError('');
-    setSuccess('');
+  setDownloading(true);
+  setError('');
+  setSuccess('');
 
-    try {
-      const response = await fetch('/api/download-video', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: url.trim(),
-          quality: format.quality,
-          title: videoInfo.title,
-          videoId: videoInfo.videoId,
-          itag: format.itag
-        }),
-      });
+  try {
+    const response = await fetch('/api/download-video', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: url.trim(),
+        itag: format.itag,
+        quality: format.quality,
+        title: videoInfo.title,
+        videoId: videoInfo.videoId
+      }),
+    });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Download service unavailable');
-      }
-
-      if (data.success && data.downloadUrl) {
-        // Redirect to download URL
-        window.open(data.downloadUrl, '_blank');
-        setSuccess(`Download started for ${format.quality} quality!`);
-      } else if (data.alternatives) {
-        // Show alternative methods
-        setSuccess(
-          `Direct download not available. Try these services:\n${data.alternatives.join('\n')}`
-        );
-      } else {
-        throw new Error('Download failed. Please try another format.');
-      }
-
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setDownloading(false);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Download failed');
     }
-  };
+
+    // Get the filename from content disposition or create one
+    const contentDisposition = response.headers.get('content-disposition');
+    let filename = `${videoInfo.title.replace(/[^a-z0-9]/gi, '_')}_${format.quality}.mp4`;
+    
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    // Create blob from response
+    const blob = await response.blob();
+    
+    // Check if blob is valid
+    if (blob.size === 0) {
+      throw new Error('Downloaded file is empty');
+    }
+
+    // Create download link and trigger download
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+
+    setSuccess(`Download completed successfully! File: ${filename}`);
+
+  } catch (err) {
+    console.error('Download error:', err);
+    setError(err.message || 'Download failed. Please try a different quality option.');
+  } finally {
+    setDownloading(false);
+  }
+};
 
   const openExternalService = (service) => {
     if (!videoInfo) return;

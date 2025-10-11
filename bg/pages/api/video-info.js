@@ -1,4 +1,4 @@
-import ytdl from 'ytdl-core';
+import axios from 'axios';
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -23,153 +23,127 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Convert mobile URL to standard YouTube URL
-    let videoUrl = url;
+    // Extract video ID from various YouTube URL formats
+    const videoId = extractVideoId(url);
     
-    // Handle mobile YouTube URLs
-    if (url.includes('m.youtube.com')) {
-      videoUrl = url.replace('m.youtube.com', 'www.youtube.com');
-    }
-    
-    // Handle youtu.be short URLs
-    if (url.includes('youtu.be')) {
-      const videoId = url.split('/').pop()?.split('?')[0];
-      if (videoId) {
-        videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-      }
-    }
-
-    // Remove unnecessary parameters that might cause issues
-    try {
-      const urlObj = new URL(videoUrl);
-      // Keep only essential parameters
-      const videoId = urlObj.searchParams.get('v');
-      if (videoId) {
-        videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-      }
-    } catch (e) {
-      // If URL parsing fails, continue with original URL
-      console.log('URL parsing failed, using original URL');
-    }
-
-    console.log('Processing URL:', videoUrl);
-
-    // Validate YouTube URL
-    if (!ytdl.validateURL(videoUrl)) {
+    if (!videoId) {
       return res.status(400).json({ 
-        error: 'Invalid YouTube URL. Please make sure it\'s a valid YouTube video URL.' 
+        error: 'Could not extract video ID from URL. Please use a standard YouTube URL.' 
       });
     }
 
-    // Get video info with timeout
-    const getInfoWithTimeout = () => {
-      return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Request timeout - YouTube took too long to respond'));
-        }, 15000); // 15 second timeout
+    console.log('Extracted video ID:', videoId);
 
-        ytdl.getInfo(videoUrl)
-          .then(info => {
-            clearTimeout(timeout);
-            resolve(info);
-          })
-          .catch(error => {
-            clearTimeout(timeout);
-            reject(error);
-          });
+    // Use YouTube oEmbed API to get basic video info
+    const oEmbedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+    
+    const [oEmbedResponse, thumbnails] = await Promise.all([
+      axios.get(oEmbedUrl).catch(() => null),
+      getVideoThumbnails(videoId)
+    ]);
+
+    if (!oEmbedResponse) {
+      return res.status(400).json({ 
+        error: 'Video not found or unavailable. It might be private, deleted, or age-restricted.' 
       });
+    }
+
+    const videoInfo = {
+      title: oEmbedResponse.data.title,
+      author: oEmbedResponse.data.author_name,
+      thumbnail: thumbnails.high || thumbnails.medium || oEmbedResponse.data.thumbnail_url,
+      videoId: videoId,
+      formats: generateDownloadOptions(videoId)
     };
 
-    const info = await getInfoWithTimeout();
-    
-    // Check if video is available
-    if (!info.videoDetails) {
-      return res.status(400).json({ 
-        error: 'Video not available. It might be private, deleted, or age-restricted.' 
-      });
-    }
+    res.status(200).json(videoInfo);
 
-    const videoDetails = {
-      title: info.videoDetails.title,
-      thumbnail: info.videoDetails.thumbnails[info.videoDetails.thumbnails.length - 1]?.url || '',
-      duration: info.videoDetails.lengthSeconds,
-      author: info.videoDetails.author?.name || 'Unknown',
-      formats: []
-    };
-
-    // Extract available formats
-    const formatMap = new Map();
-    
-    info.formats.forEach(format => {
-      if (format.hasVideo && format.hasAudio && format.container === 'mp4') {
-        const quality = format.qualityLabel || 'Unknown';
-        if (!formatMap.has(quality) || format.bitrate > (formatMap.get(quality)?.bitrate || 0)) {
-          formatMap.set(quality, {
-            quality: quality,
-            container: format.container,
-            qualityLabel: format.qualityLabel,
-            itag: format.itag,
-            url: format.url,
-            bitrate: format.bitrate
-          });
-        }
-      }
-    });
-
-    // If no combined formats found, look for video-only and audio-only
-    if (formatMap.size === 0) {
-      info.formats.forEach(format => {
-        if ((format.hasVideo || format.hasAudio) && format.container === 'mp4') {
-          const quality = format.qualityLabel || (format.hasAudio ? 'Audio' : 'Unknown');
-          if (!formatMap.has(quality) || format.bitrate > (formatMap.get(quality)?.bitrate || 0)) {
-            formatMap.set(quality, {
-              quality: quality,
-              container: format.container,
-              qualityLabel: format.qualityLabel,
-              itag: format.itag,
-              url: format.url,
-              bitrate: format.bitrate,
-              hasVideo: format.hasVideo,
-              hasAudio: format.hasAudio
-            });
-          }
-        }
-      });
-    }
-
-    videoDetails.formats = Array.from(formatMap.values())
-      .sort((a, b) => {
-        const qualityA = parseInt(a.quality) || 0;
-        const qualityB = parseInt(b.quality) || 0;
-        return qualityB - qualityA;
-      });
-
-    // If still no formats, return error
-    if (videoDetails.formats.length === 0) {
-      return res.status(400).json({ 
-        error: 'No downloadable formats found. This video might be restricted or unavailable for download.' 
-      });
-    }
-
-    res.status(200).json(videoDetails);
   } catch (error) {
     console.error('Error fetching video info:', error);
     
     let errorMessage = 'Failed to fetch video information. ';
     
-    if (error.message.includes('Request timeout')) {
-      errorMessage += 'The request timed out. Please try again.';
-    } else if (error.message.includes('Video unavailable')) {
-      errorMessage += 'The video is unavailable. It might be private or deleted.';
-    } else if (error.message.includes('Sign in to confirm your age')) {
-      errorMessage += 'This video is age-restricted and cannot be downloaded.';
+    if (error.response?.status === 404) {
+      errorMessage += 'Video not found. Please check the URL.';
+    } else if (error.code === 'ENOTFOUND') {
+      errorMessage += 'Network error. Please check your connection.';
     } else {
-      errorMessage += 'Please check the URL and try again.';
+      errorMessage += 'Please try again with a different URL.';
     }
 
     res.status(500).json({ 
-      error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: errorMessage
     });
   }
+}
+
+function extractVideoId(url) {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&?#]+)/,
+    /(?:m\.youtube\.com\/watch\?v=)([^&?#]+)/,
+    /youtube\.com\/watch\?.*v=([^&?#]+)/,
+    /youtu\.be\/([^&?#]+)/
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  
+  return null;
+}
+
+async function getVideoThumbnails(videoId) {
+  const qualities = ['maxresdefault', 'sddefault', 'hqdefault', 'mqdefault', 'default'];
+  const thumbnails = {};
+
+  // Return thumbnail URLs for different qualities
+  return {
+    high: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+    medium: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+    low: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`
+  };
+}
+
+function generateDownloadOptions(videoId) {
+  // These are common quality options for YouTube videos
+  return [
+    {
+      quality: '1080p',
+      label: 'Full HD (1080p)',
+      itag: '137',
+      type: 'mp4',
+      container: 'mp4'
+    },
+    {
+      quality: '720p',
+      label: 'HD (720p)',
+      itag: '22',
+      type: 'mp4',
+      container: 'mp4'
+    },
+    {
+      quality: '480p',
+      label: 'Standard (480p)',
+      itag: '135',
+      type: 'mp4',
+      container: 'mp4'
+    },
+    {
+      quality: '360p',
+      label: 'Medium (360p)',
+      itag: '18',
+      type: 'mp4',
+      container: 'mp4'
+    },
+    {
+      quality: '240p',
+      label: 'Low (240p)',
+      itag: '133',
+      type: 'mp4',
+      container: 'mp4'
+    }
+  ];
 }

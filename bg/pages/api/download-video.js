@@ -1,5 +1,4 @@
 import ytdl from 'ytdl-core';
-import { PassThrough } from 'stream';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -13,13 +12,19 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Convert mobile URL to standard YouTube URL
+    let videoUrl = url;
+    if (url.includes('m.youtube.com')) {
+      videoUrl = url.replace('m.youtube.com', 'www.youtube.com');
+    }
+
     // Validate YouTube URL
-    if (!ytdl.validateURL(url)) {
+    if (!ytdl.validateURL(videoUrl)) {
       return res.status(400).json({ error: 'Invalid YouTube URL' });
     }
 
-    // Get video info to verify
-    const info = await ytdl.getInfo(url);
+    // Get video info to verify format availability
+    const info = await ytdl.getInfo(videoUrl);
     const format = ytdl.chooseFormat(info.formats, { quality: itag });
 
     if (!format) {
@@ -27,23 +32,46 @@ export default async function handler(req, res) {
     }
 
     // Sanitize filename
-    const sanitizedTitle = title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const filename = `${sanitizedTitle}_${quality}.mp4`;
+    const sanitizedTitle = title
+      .replace(/[^a-z0-9\s]/gi, '_')
+      .replace(/\s+/g, '_')
+      .toLowerCase()
+      .substring(0, 100); // Limit length
+
+    const filename = `${sanitizedTitle}_${quality}.${format.container || 'mp4'}`;
 
     // Set headers for download
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Content-Type', format.mimeType || 'video/mp4');
+    res.setHeader('Cache-Control', 'no-cache');
 
-    // Create stream and pipe to response
-    const videoStream = ytdl(url, { format: format });
-    
-    videoStream.pipe(res);
+    // Create stream with error handling
+    const videoStream = ytdl(videoUrl, { 
+      format: format,
+      quality: itag
+    });
 
-    // Handle stream errors
+    // Handle stream events
     videoStream.on('error', (error) => {
       console.error('Stream error:', error);
       if (!res.headersSent) {
-        res.status(500).json({ error: 'Stream error occurred' });
+        res.status(500).json({ error: 'Stream error occurred during download' });
+      } else {
+        res.end();
+      }
+    });
+
+    videoStream.on('info', (info, format) => {
+      console.log('Download started for:', info.videoDetails.title);
+    });
+
+    // Pipe stream to response
+    videoStream.pipe(res);
+
+    // Handle client disconnect
+    req.on('close', () => {
+      if (videoStream.destroy) {
+        videoStream.destroy();
       }
     });
 

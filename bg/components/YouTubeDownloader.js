@@ -48,7 +48,6 @@ const YouTubeDownloader = () => {
   };
 
   const downloadVideo = async (format) => {
-    // We can remove the 'format' parameter if the backend always chooses 'highest'
     if (!videoInfo || downloading) return;
 
     setDownloading(true);
@@ -56,60 +55,69 @@ const YouTubeDownloader = () => {
     setSuccess('');
 
     try {
-      // 1. Ensure the API endpoint matches your file name (e.g., /api/download)
-      const response = await fetch('/api/download', {
+      const response = await fetch('/api/download-video', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        // 2. Simplified the request body. The backend only needs the URL and title.
         body: JSON.stringify({
           url: url.trim(),
+          quality: format.quality,
           title: videoInfo.title,
+          videoId: videoInfo.videoId
         }),
       });
 
-      // If the response is not OK (e.g., status 400 or 500), handle the error.
-      if (!response.ok) {
-        const errorData = await response.json(); // The backend sends a JSON error
-        throw new Error(errorData.error || 'The server returned an error.');
-      }
-
-      // 3. The logic is now much simpler. We only handle the direct stream.
-      const blob = await response.blob();
+      // Check if response is JSON (external service) or a stream (direct download)
+      const contentType = response.headers.get('content-type');
       
-      if (blob.size === 0) {
-        throw new Error('Downloaded file is empty. The video may be unavailable.');
-      }
-
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      
-      // Get filename from the 'content-disposition' header sent by the server.
-      const contentDisposition = response.headers.get('content-disposition');
-      let filename = `${videoInfo.title.replace(/[^a-z0-9]/gi, '_')}.mp4`; // A fallback filename
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1];
+      if (contentType && contentType.includes('application/json')) {
+        const data = await response.json();
+        
+        if (data.success && data.external) {
+          // External service - open in new tab
+          window.open(data.downloadUrl, '_blank');
+          setSuccess(`Opening external download service for ${format.quality} quality...`);
+        } else if (data.success) {
+          setSuccess('Download started!');
+        } else {
+          throw new Error(data.error || 'Download failed');
         }
-      }
-      
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click(); // This triggers the download in the browser.
-      
-      // Clean up the created elements
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
+      } else {
+        // It's a direct download stream
+        const blob = await response.blob();
+        
+        if (blob.size === 0) {
+          throw new Error('Downloaded file is empty');
+        }
 
-      setSuccess(`Download for "${filename}" has started!`);
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        
+        // Get filename from content-disposition header or create one
+        const contentDisposition = response.headers.get('content-disposition');
+        let filename = `${videoInfo.title.replace(/[^a-z0-9]/gi, '_')}_${format.quality}.mp4`;
+        
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+          if (filenameMatch) {
+            filename = filenameMatch[1];
+          }
+        }
+        
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(downloadUrl);
+
+        setSuccess(`Download completed successfully! File: ${filename}`);
+      }
 
     } catch (err) {
       console.error('Download error:', err);
-      setError(err.message || 'An unexpected error occurred. Please try again.');
+      setError(err.message || 'Download failed. Please try a different quality option.');
     } finally {
       setDownloading(false);
     }

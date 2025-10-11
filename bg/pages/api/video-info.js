@@ -1,8 +1,6 @@
 import axios from 'axios';
-import ytdl from 'ytdl-core';
 
 export default async function handler(req, res) {
-  // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -24,48 +22,32 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Extract video ID from various YouTube URL formats
     const videoId = extractVideoId(url);
     
     if (!videoId) {
       return res.status(400).json({ 
-        error: 'Could not extract video ID from URL. Please use a standard YouTube URL.' 
+        error: 'Could not extract video ID from URL.' 
       });
     }
 
-    console.log('Extracted video ID:', videoId);
+    console.log('Processing video ID:', videoId);
 
-    // Convert to standard URL for ytdl-core
-    const standardUrl = `https://www.youtube.com/watch?v=${videoId}`;
-
-    // Use YouTube oEmbed API to get basic video info
-    const oEmbedUrl = `https://www.youtube.com/oembed?url=${standardUrl}&format=json`;
+    // Use YouTube oEmbed API for basic info
+    const oEmbedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
     
-    let oEmbedResponse;
-    try {
-      oEmbedResponse = await axios.get(oEmbedUrl);
-    } catch (error) {
-      return res.status(400).json({ 
-        error: 'Video not found or unavailable. It might be private, deleted, or age-restricted.' 
-      });
-    }
-
-    // Get available formats using ytdl-core
-    let formats = [];
-    try {
-      const info = await ytdl.getInfo(standardUrl);
-      formats = getAvailableFormats(info.formats);
-    } catch (error) {
-      console.log('Could not get formats with ytdl-core, using default formats');
-      formats = getDefaultFormats();
-    }
+    const oEmbedResponse = await axios.get(oEmbedUrl, {
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
 
     const videoInfo = {
       title: oEmbedResponse.data.title,
       author: oEmbedResponse.data.author_name,
       thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
       videoId: videoId,
-      formats: formats
+      formats: getAvailableFormats()
     };
 
     res.status(200).json(videoInfo);
@@ -77,8 +59,6 @@ export default async function handler(req, res) {
     
     if (error.response?.status === 404) {
       errorMessage += 'Video not found. Please check the URL.';
-    } else if (error.code === 'ENOTFOUND') {
-      errorMessage += 'Network error. Please check your connection.';
     } else {
       errorMessage += 'Please try again with a different URL.';
     }
@@ -107,86 +87,37 @@ function extractVideoId(url) {
   return null;
 }
 
-function getAvailableFormats(formats) {
-  const availableFormats = [];
-  const qualityMap = new Map();
-
-  // Look for formats with both video and audio
-  formats.forEach(format => {
-    if (format.hasVideo && format.hasAudio && format.container === 'mp4') {
-      const quality = format.qualityLabel || 'Unknown';
-      if (!qualityMap.has(quality) || format.bitrate > (qualityMap.get(quality)?.bitrate || 0)) {
-        qualityMap.set(quality, {
-          quality: quality,
-          label: `${quality} (Recommended)`,
-          itag: format.itag,
-          type: 'mp4',
-          container: format.container,
-          bitrate: format.bitrate
-        });
-      }
-    }
-  });
-
-  // If no combined formats, look for separate video and audio
-  if (qualityMap.size === 0) {
-    formats.forEach(format => {
-      if (format.hasVideo && format.container === 'mp4') {
-        const quality = format.qualityLabel || 'Video';
-        if (!qualityMap.has(quality)) {
-          qualityMap.set(quality, {
-            quality: quality,
-            label: `${quality} (Video only)`,
-            itag: format.itag,
-            type: 'mp4',
-            container: format.container,
-            hasVideo: true,
-            hasAudio: false
-          });
-        }
-      }
-    });
-  }
-
-  // Convert to array and sort by quality
-  return Array.from(qualityMap.values())
-    .sort((a, b) => {
-      const qualityA = parseInt(a.quality) || 0;
-      const qualityB = parseInt(b.quality) || 0;
-      return qualityB - qualityA;
-    });
-}
-
-function getDefaultFormats() {
-  // Fallback formats if ytdl-core fails
+function getAvailableFormats() {
   return [
     {
       quality: '1080p',
       label: 'Full HD (1080p)',
       itag: '137',
-      type: 'mp4',
-      container: 'mp4'
+      type: 'mp4'
     },
     {
-      quality: '720p',
+      quality: '720p', 
       label: 'HD (720p)',
       itag: '22',
-      type: 'mp4',
-      container: 'mp4'
+      type: 'mp4'
     },
     {
       quality: '480p',
       label: 'Standard (480p)',
       itag: '135',
-      type: 'mp4',
-      container: 'mp4'
+      type: 'mp4'
     },
     {
       quality: '360p',
       label: 'Medium (360p)',
       itag: '18',
-      type: 'mp4',
-      container: 'mp4'
+      type: 'mp4'
+    },
+    {
+      quality: '240p',
+      label: 'Low (240p)',
+      itag: '133',
+      type: 'mp4'
     }
   ];
 }

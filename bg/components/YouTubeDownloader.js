@@ -62,25 +62,29 @@ const YouTubeDownloader = () => {
         },
         body: JSON.stringify({
           url: url.trim(),
-          itag: format.itag,
           quality: format.quality,
           title: videoInfo.title,
           videoId: videoInfo.videoId
         }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok && !data.external) {
-        throw new Error(data.error || 'Download failed');
-      }
-
-      if (data.success && data.external) {
-        // Open external service in new tab
-        window.open(data.downloadUrl, '_blank');
-        setSuccess(`Redirecting to external download service for ${format.quality} quality...`);
-      } else if (data.success) {
-        // Handle direct download
+      // Check if response is JSON (external service) or a stream (direct download)
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        const data = await response.json();
+        
+        if (data.success && data.external) {
+          // External service - open in new tab
+          window.open(data.downloadUrl, '_blank');
+          setSuccess(`Opening external download service for ${format.quality} quality...`);
+        } else if (data.success) {
+          setSuccess('Download started!');
+        } else {
+          throw new Error(data.error || 'Download failed');
+        }
+      } else {
+        // It's a direct download stream
         const blob = await response.blob();
         
         if (blob.size === 0) {
@@ -90,20 +94,25 @@ const YouTubeDownloader = () => {
         const downloadUrl = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = downloadUrl;
-        link.download = data.filename || `${videoInfo.title.replace(/[^a-z0-9]/gi, '_')}_${format.quality}.mp4`;
+        
+        // Get filename from content-disposition header or create one
+        const contentDisposition = response.headers.get('content-disposition');
+        let filename = `${videoInfo.title.replace(/[^a-z0-9]/gi, '_')}_${format.quality}.mp4`;
+        
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+          if (filenameMatch) {
+            filename = filenameMatch[1];
+          }
+        }
+        
+        link.download = filename;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(downloadUrl);
 
-        setSuccess(`Download completed successfully!`);
-      } else if (data.alternatives) {
-        // Show alternative methods
-        setSuccess(
-          `Direct download not available. Try these services:\n${data.alternatives.join('\n')}`
-        );
-      } else {
-        throw new Error('Download failed. Please try another format.');
+        setSuccess(`Download completed successfully! File: ${filename}`);
       }
 
     } catch (err) {
@@ -114,20 +123,17 @@ const YouTubeDownloader = () => {
     }
   };
 
-  // Simple direct download using iframe (last resort)
-  const trySimpleDownload = (format) => {
+  const openExternalService = (serviceName) => {
     if (!videoInfo) return;
     
-    const videoId = videoInfo.videoId;
-    const services = [
-      `https://ssyoutube.com/watch?v=${videoId}`,
-      `https://en.savefrom.net/download-from-youtube/?url=${encodeURIComponent(url)}`,
-      `https://ytmp3.cc/en13/?v=${videoId}`
-    ];
+    const services = {
+      ssyoutube: `https://ssyoutube.com/watch?v=${videoInfo.videoId}`,
+      savefrom: `https://en.savefrom.net/download-from-youtube/?url=${encodeURIComponent(url)}`,
+      ytmp3: `https://ytmp3.cc/en13/?v=${videoInfo.videoId}`
+    };
     
-    // Open the first service in new tab
-    window.open(services[0], '_blank');
-    setSuccess('Opening external download service...');
+    window.open(services[serviceName], '_blank');
+    setSuccess(`Opening ${serviceName}...`);
   };
 
   const resetForm = () => {
@@ -138,15 +144,44 @@ const YouTubeDownloader = () => {
   };
 
   const exampleUrls = [
-    'https://www.youtube.com/watch?v=J9Fb6QMRZaA',
-    'https://youtu.be/J9Fb6QMRZaA',
-    'https://m.youtube.com/watch?v=J9Fb6QMRZaA'
+    'https://www.youtube.com/watch?v=umekI0D6el8',
+    'https://youtu.be/umekI0D6el8',
+    'https://m.youtube.com/watch?v=umekI0D6el8'
   ];
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      {/* Header and legal notice same as before */}
-      
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">
+          YouTube Video Downloader
+        </h1>
+        <p className="text-gray-600">
+          Download YouTube videos directly to your device
+        </p>
+      </div>
+
+      {/* Legal Notice */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-8">
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-yellow-800">
+              Important Notice
+            </h3>
+            <div className="mt-2 text-sm text-yellow-700">
+              <p>
+                This tool is for personal use only. Please respect copyright laws and YouTube's Terms of Service. 
+                Only download videos you have permission to use.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* URL Input Form */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
         <form onSubmit={fetchVideoInfo} className="space-y-4">
@@ -159,19 +194,44 @@ const YouTubeDownloader = () => {
               id="youtube-url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="Paste YouTube URL here (e.g., https://www.youtube.com/watch?v=J9Fb6QMRZaA)"
+              placeholder="Paste YouTube URL here (e.g., https://www.youtube.com/watch?v=umekI0D6el8)"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
               disabled={loading}
             />
           </div>
 
+          {/* Example URLs */}
+          <div className="text-sm text-gray-600">
+            <p className="font-medium mb-2">Try these example URLs:</p>
+            <div className="space-y-1">
+              {exampleUrls.map((exampleUrl, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => setUrl(exampleUrl)}
+                  className="block text-blue-600 hover:text-blue-800 text-left text-xs"
+                >
+                  {exampleUrl}
+                </button>
+              ))}
+            </div>
+          </div>
+          
           <div className="flex gap-4">
             <button
               type="submit"
               disabled={loading || !url.trim()}
               className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors font-medium"
             >
-              {loading ? 'Fetching Video Info...' : 'Get Video Info'}
+              {loading ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Fetching Video Info...
+                </span>
+              ) : 'Get Video Info'}
             </button>
             
             {videoInfo && (
@@ -186,7 +246,7 @@ const YouTubeDownloader = () => {
           </div>
         </form>
 
-        {/* Success and Error Messages */}
+        {/* Success Message */}
         {success && (
           <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
             <div className="flex items-start">
@@ -198,6 +258,7 @@ const YouTubeDownloader = () => {
           </div>
         )}
 
+        {/* Error Message */}
         {error && (
           <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-start">
@@ -236,68 +297,63 @@ const YouTubeDownloader = () => {
           {/* Download Options */}
           <div className="mb-8">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Download Options</h3>
-            
-            {/* Method 1: Direct Download */}
-            <div className="mb-6">
-              <h4 className="font-medium text-gray-700 mb-3">Direct Download (Try First):</h4>
-              <div className="grid gap-3">
-                {videoInfo.formats.map((format, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                        </svg>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-900">{format.label}</span>
-                        <span className="text-gray-500 text-sm ml-2">({format.container})</span>
-                      </div>
+            <div className="grid gap-3">
+              {videoInfo.formats.map((format, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                      </svg>
                     </div>
-                    
-                    <button
-                      onClick={() => downloadVideo(format)}
-                      disabled={downloading}
-                      className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed transition-colors font-medium"
-                    >
-                      {downloading ? 'Processing...' : 'Download'}
-                    </button>
+                    <div>
+                      <span className="font-medium text-gray-900">{format.label}</span>
+                      <span className="text-gray-500 text-sm ml-2">({format.type})</span>
+                    </div>
                   </div>
-                ))}
-              </div>
+                  
+                  <button
+                    onClick={() => downloadVideo(format)}
+                    disabled={downloading}
+                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed transition-colors font-medium"
+                  >
+                    {downloading ? 'Downloading...' : 'Download'}
+                  </button>
+                </div>
+              ))}
             </div>
+          </div>
 
-            {/* Method 2: Quick External Download */}
-            <div>
-              <h4 className="font-medium text-gray-700 mb-3">Quick External Download:</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button
-                  onClick={() => trySimpleDownload('1080p')}
-                  className="p-4 border border-orange-200 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors text-center"
-                >
-                  <div className="font-medium text-orange-900">SSYouTube</div>
-                  <div className="text-sm text-orange-700 mt-1">Fast & Reliable</div>
-                </button>
-                
-                <button
-                  onClick={() => trySimpleDownload('720p')}
-                  className="p-4 border border-purple-200 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-center"
-                >
-                  <div className="font-medium text-purple-900">SaveFrom.net</div>
-                  <div className="text-sm text-purple-700 mt-1">Multiple Formats</div>
-                </button>
-                
-                <button
-                  onClick={() => trySimpleDownload('audio')}
-                  className="p-4 border border-green-200 bg-green-50 rounded-lg hover:bg-green-100 transition-colors text-center"
-                >
-                  <div className="font-medium text-green-900">YTMP3</div>
-                  <div className="text-sm text-green-700 mt-1">MP3/MP4 Converter</div>
-                </button>
-              </div>
+          {/* Quick External Services */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick External Services</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button
+                onClick={() => openExternalService('ssyoutube')}
+                className="p-4 border border-orange-200 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors text-center"
+              >
+                <div className="font-medium text-orange-900">SSYouTube</div>
+                <div className="text-sm text-orange-700 mt-1">Fast & Reliable</div>
+              </button>
+              
+              <button
+                onClick={() => openExternalService('savefrom')}
+                className="p-4 border border-purple-200 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-center"
+              >
+                <div className="font-medium text-purple-900">SaveFrom.net</div>
+                <div className="text-sm text-purple-700 mt-1">Multiple Formats</div>
+              </button>
+              
+              <button
+                onClick={() => openExternalService('ytmp3')}
+                className="p-4 border border-green-200 bg-green-50 rounded-lg hover:bg-green-100 transition-colors text-center"
+              >
+                <div className="font-medium text-green-900">YTMP3</div>
+                <div className="text-sm text-green-700 mt-1">MP3/MP4 Converter</div>
+              </button>
             </div>
           </div>
         </div>
@@ -307,4 +363,3 @@ const YouTubeDownloader = () => {
 };
 
 export default YouTubeDownloader;
-

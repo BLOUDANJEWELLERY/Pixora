@@ -1,4 +1,3 @@
-import ytdl from 'ytdl-core';
 import axios from 'axios';
 
 export default async function handler(req, res) {
@@ -33,34 +32,33 @@ export default async function handler(req, res) {
 
     console.log('Processing video ID:', videoId);
 
-    // Validate YouTube URL
-    if (!ytdl.validateID(videoId)) {
-      return res.status(400).json({ error: 'Invalid YouTube video ID' });
-    }
+    // Use YouTube oEmbed API for basic info
+    const oEmbedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+    
+    const oEmbedResponse = await axios.get(oEmbedUrl, {
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
 
-    // Get video info using ytdl-core
-    const videoInfo = await ytdl.getInfo(videoId);
-    const videoDetails = videoInfo.videoDetails;
-
-    const videoData = {
-      title: videoDetails.title,
-      author: videoDetails.author.name,
-      thumbnail: videoDetails.thumbnails[videoDetails.thumbnails.length - 1].url,
+    const videoInfo = {
+      title: oEmbedResponse.data.title,
+      author: oEmbedResponse.data.author_name,
+      thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
       videoId: videoId,
-      duration: videoDetails.lengthSeconds,
-      viewCount: videoDetails.viewCount,
       formats: getAvailableFormats()
     };
 
-    res.status(200).json(videoData);
+    res.status(200).json(videoInfo);
 
   } catch (error) {
     console.error('Error fetching video info:', error);
     
     let errorMessage = 'Failed to fetch video information. ';
     
-    if (error.message.includes('Video unavailable')) {
-      errorMessage += 'Video not found or unavailable.';
+    if (error.response?.status === 404) {
+      errorMessage += 'Video not found. Please check the URL.';
     } else {
       errorMessage += 'Please try again with a different URL.';
     }
@@ -71,7 +69,6 @@ export default async function handler(req, res) {
   }
 }
 
-// Keep your existing extractVideoId and getAvailableFormats functions
 function extractVideoId(url) {
   const patterns = [
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&?#]+)/,

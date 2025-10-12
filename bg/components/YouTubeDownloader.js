@@ -47,81 +47,40 @@ const YouTubeDownloader = () => {
     }
   };
 
-  const downloadVideo = async (format) => {
-    if (!videoInfo || downloading) return;
+// To download a video
+const downloadVideo = async (videoId, quality, title) => {
+  try {
+    const response = await fetch('/api/download-video', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        videoId: videoId,
+        quality: quality,
+        title: title
+      }),
+    });
 
-    setDownloading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const response = await fetch('/api/download-video', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: url.trim(),
-          quality: format.quality,
-          title: videoInfo.title,
-          videoId: videoInfo.videoId
-        }),
-      });
-
-      // Check if response is JSON (external service) or a stream (direct download)
-      const contentType = response.headers.get('content-type');
-      
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        
-        if (data.success && data.external) {
-          // External service - open in new tab
-          window.open(data.downloadUrl, '_blank');
-          setSuccess(`Opening external download service for ${format.quality} quality...`);
-        } else if (data.success) {
-          setSuccess('Download started!');
-        } else {
-          throw new Error(data.error || 'Download failed');
-        }
-      } else {
-        // It's a direct download stream
-        const blob = await response.blob();
-        
-        if (blob.size === 0) {
-          throw new Error('Downloaded file is empty');
-        }
-
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        
-        // Get filename from content-disposition header or create one
-        const contentDisposition = response.headers.get('content-disposition');
-        let filename = `${videoInfo.title.replace(/[^a-z0-9]/gi, '_')}_${format.quality}.mp4`;
-        
-        if (contentDisposition) {
-          const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-          if (filenameMatch) {
-            filename = filenameMatch[1];
-          }
-        }
-        
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(downloadUrl);
-
-        setSuccess(`Download completed successfully! File: ${filename}`);
-      }
-
-    } catch (err) {
-      console.error('Download error:', err);
-      setError(err.message || 'Download failed. Please try a different quality option.');
-    } finally {
-      setDownloading(false);
+    if (response.ok) {
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `${title}_${quality}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } else {
+      const error = await response.json();
+      console.error('Download failed:', error);
     }
-  };
+  } catch (error) {
+    console.error('Error:', error);
+  }
+};
 
 
   const openExternalService = (serviceName) => {

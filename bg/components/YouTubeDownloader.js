@@ -48,7 +48,13 @@ const YouTubeDownloader = () => {
   };
 
 // To download a video
-const downloadVideo = async (videoId, quality, title) => {
+const downloadVideo = async (format) => {
+  if (!videoInfo || downloading) return;
+
+  setDownloading(true);
+  setError('');
+  setSuccess('');
+
   try {
     const response = await fetch('/api/download-video', {
       method: 'POST',
@@ -56,29 +62,52 @@ const downloadVideo = async (videoId, quality, title) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        videoId: videoId,
-        quality: quality,
-        title: title
+        videoId: videoInfo.videoId,
+        quality: format.quality,
+        title: videoInfo.title
       }),
     });
 
-    if (response.ok) {
-      // Create blob and download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = `${title}_${quality}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } else {
-      const error = await response.json();
-      console.error('Download failed:', error);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Download failed');
     }
-  } catch (error) {
-    console.error('Error:', error);
+
+    // Get filename from content-disposition header
+    const contentDisposition = response.headers.get('content-disposition');
+    let filename = `${videoInfo.title.replace(/[^a-z0-9]/gi, '_')}_${format.quality}.mp4`;
+    
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    // Create blob from response
+    const blob = await response.blob();
+    
+    if (blob.size === 0) {
+      throw new Error('Downloaded file is empty - please try a different quality');
+    }
+
+    // Create download link
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+
+    setSuccess(`Download completed! Saved as: ${filename}`);
+
+  } catch (err) {
+    console.error('Download error:', err);
+    setError(err.message || 'Download failed. Please try a different quality option.');
+  } finally {
+    setDownloading(false);
   }
 };
 

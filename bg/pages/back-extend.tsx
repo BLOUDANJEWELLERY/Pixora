@@ -1,38 +1,43 @@
-// pages/back-extend.tsx
 "use client";
-import Head from "next/head";
 import { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../components/Header";
 
+type ResizeMode = "stretch" | "extend";
 type ExportFormat = "png" | "jpeg" | "jpg" | "webp";
 
-export default function EdgeExtendBackground() {
-  const [imgElement, setImgElement] = useState<HTMLImageElement | null>(null);
-  const [imgDimensions, setImgDimensions] = useState<{ width: number; height: number } | null>(null);
-
-  const [padding, setPadding] = useState<number>(100);
-  const [blur] = useState<boolean>(false);
+export default function ImageResizer() {
+  const [image, setImage] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [width, setWidth] = useState<number>(0);
+  const [height, setHeight] = useState<number>(0);
+  const [resized, setResized] = useState<string | null>(null);
+  const [mode, setMode] = useState<ResizeMode>("stretch");
+  const [originalDimensions, setOriginalDimensions] = useState<{width: number, height: number} | null>(null);
+  
+  // Background extender specific states
   const [edgeSize, setEdgeSize] = useState<number>(50);
-
   const [format, setFormat] = useState<ExportFormat>("png");
   const [quality, setQuality] = useState<number>(0.9);
   const [estimatedSize, setEstimatedSize] = useState<string>("");
 
-  const [downloading, setDownloading] = useState<boolean>(false);
-
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const edgeCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Load image
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const img = new Image();
-      img.src = URL.createObjectURL(e.target.files[0]);
-      img.onload = () => {
-        setImgElement(img);
-        setImgDimensions({ width: img.width, height: img.height });
-      };
-    }
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImage(file);
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+
+    const img = new Image();
+    img.onload = () => {
+      setWidth(img.width);
+      setHeight(img.height);
+      setOriginalDimensions({ width: img.width, height: img.height });
+      // Set default edge size based on image dimensions
+      setEdgeSize(Math.min(50, Math.min(img.width, img.height) / 4));
+    };
+    img.src = url;
   };
 
   // Estimate file size
@@ -61,125 +66,173 @@ export default function EdgeExtendBackground() {
     setEstimatedSize(fileSizeMB > 1 ? `${fileSizeMB.toFixed(2)} MB` : `${fileSizeKB.toFixed(1)} KB`);
   }, [format, quality]);
 
-  // Download
-  const handleDownload = async () => {
-    if (!canvasRef.current) return;
-    setDownloading(true);
+  const copyStrip = (
+    ctx: CanvasRenderingContext2D,
+    img: HTMLImageElement,
+    sx: number,
+    sy: number,
+    sw: number,
+    sh: number,
+    dx: number,
+    dy: number,
+    dw: number,
+    dh: number
+  ) => {
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = sw;
+    tempCanvas.height = sh;
+    const tctx = tempCanvas.getContext("2d");
+    if (!tctx) return;
+    tctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    ctx.drawImage(tempCanvas, 0, 0, sw, sh, dx, dy, dw, dh);
+  };
+
+  const handleResize = () => {
+    if (!image || !width || !height || !originalDimensions) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) return;
+
+    const img = new Image();
+    img.onload = () => {
+      if (mode === "stretch") {
+        // Default mode - stretch the image
+        ctx.drawImage(img, 0, 0, width, height);
+        const resizedUrl = canvas.toDataURL("image/png");
+        setResized(resizedUrl);
+      } else {
+        // Background extender mode using your improved logic
+        const originalAspect = originalDimensions.width / originalDimensions.height;
+        const targetAspect = width / height;
+
+        if (Math.abs(originalAspect - targetAspect) < 0.01) {
+          // Same aspect ratio, just resize
+          ctx.drawImage(img, 0, 0, width, height);
+          const resizedUrl = canvas.toDataURL("image/png");
+          setResized(resizedUrl);
+        } else {
+          // Different aspect ratio - use edge extension
+          const scale = Math.min(
+            width / originalDimensions.width,
+            height / originalDimensions.height
+          );
+
+          const scaledWidth = originalDimensions.width * scale;
+          const scaledHeight = originalDimensions.height * scale;
+
+          const xOffset = (width - scaledWidth) / 2;
+          const yOffset = (height - scaledHeight) / 2;
+
+          ctx.clearRect(0, 0, width, height);
+
+          const stripW = Math.min(edgeSize, originalDimensions.width);
+          const stripH = Math.min(edgeSize, originalDimensions.height);
+
+          // Edges + corners using your improved logic
+          // Top edge
+          copyStrip(
+            ctx,
+            img,
+            0, 0, originalDimensions.width, stripH,
+            xOffset, 0, scaledWidth, yOffset
+          );
+
+          // Bottom edge
+          copyStrip(
+            ctx,
+            img,
+            0, originalDimensions.height - stripH, originalDimensions.width, stripH,
+            xOffset, height - yOffset, scaledWidth, yOffset
+          );
+
+          // Left edge
+          copyStrip(
+            ctx,
+            img,
+            0, 0, stripW, originalDimensions.height,
+            0, yOffset, xOffset, scaledHeight
+          );
+
+          // Right edge
+          copyStrip(
+            ctx,
+            img,
+            originalDimensions.width - stripW, 0, stripW, originalDimensions.height,
+            width - xOffset, yOffset, xOffset, scaledHeight
+          );
+
+          // Corners
+          // Top-left
+          copyStrip(
+            ctx,
+            img,
+            0, 0, stripW, stripH,
+            0, 0, xOffset, yOffset
+          );
+
+          // Top-right
+          copyStrip(
+            ctx,
+            img,
+            originalDimensions.width - stripW, 0, stripW, stripH,
+            width - xOffset, 0, xOffset, yOffset
+          );
+
+          // Bottom-left
+          copyStrip(
+            ctx,
+            img,
+            0, originalDimensions.height - stripH, stripW, stripH,
+            0, height - yOffset, xOffset, yOffset
+          );
+
+          // Bottom-right
+          copyStrip(
+            ctx,
+            img,
+            originalDimensions.width - stripW, originalDimensions.height - stripH, stripW, stripH,
+            width - xOffset, height - yOffset, xOffset, yOffset
+          );
+
+          // Draw the original image scaled in the center
+          ctx.drawImage(img, xOffset, yOffset, scaledWidth, scaledHeight);
+
+          // Set canvas ref for file size estimation
+          if (canvasRef.current) {
+            canvasRef.current.width = width;
+            canvasRef.current.height = height;
+            canvasRef.current.getContext('2d')?.drawImage(canvas, 0, 0);
+            updateFileSize();
+          }
+
+          const resizedUrl = canvas.toDataURL("image/png");
+          setResized(resizedUrl);
+        }
+      }
+    };
+    img.src = URL.createObjectURL(image);
+  };
+
+  const handleDownload = () => {
+    if (!resized) return;
 
     let mimeType = "image/png";
     if (format === "jpeg" || format === "jpg") mimeType = "image/jpeg";
     if (format === "webp") mimeType = "image/webp";
 
-    const link = document.createElement("a");
-    link.href =
-      mimeType === "image/png"
-        ? canvasRef.current.toDataURL(mimeType)
-        : canvasRef.current.toDataURL(mimeType, quality);
-
-    link.download = `extended-image.${format}`;
-    link.click();
-
-    setTimeout(() => setDownloading(false), 1500);
+    const a = document.createElement("a");
+    a.href = resized;
+    a.download = `resized-image.${format}`;
+    a.click();
   };
 
-  // Redraw
-  const redraw = useCallback(() => {
-    if (!imgElement || !canvasRef.current || !edgeCanvasRef.current) return;
-
-    const img = imgElement;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    canvas.width = img.width + padding * 2;
-    canvas.height = img.height + padding * 2;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const stripW = Math.min(edgeSize, img.width);
-    const stripH = Math.min(edgeSize, img.height);
-
-    const copyStrip = (
-      sx: number,
-      sy: number,
-      sw: number,
-      sh: number,
-      dx: number,
-      dy: number,
-      dw: number,
-      dh: number
-    ) => {
-      const tempCanvas = document.createElement("canvas");
-      tempCanvas.width = sw;
-      tempCanvas.height = sh;
-      const tctx = tempCanvas.getContext("2d");
-      if (!tctx) return;
-      tctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-      ctx.drawImage(tempCanvas, 0, 0, sw, sh, dx, dy, dw, dh);
-    };
-
-    // Edges + corners
-    copyStrip(0, 0, img.width, stripH, padding, 0, img.width, padding);
-    copyStrip(0, img.height - stripH, img.width, stripH, padding, canvas.height - padding, img.width, padding);
-    copyStrip(0, 0, stripW, img.height, 0, padding, padding, img.height);
-    copyStrip(img.width - stripW, 0, stripW, img.height, canvas.width - padding, padding, padding, img.height);
-    copyStrip(0, 0, stripW, stripH, 0, 0, padding, padding);
-    copyStrip(img.width - stripW, 0, stripW, stripH, canvas.width - padding, 0, padding, padding);
-    copyStrip(0, img.height - stripH, stripW, stripH, 0, canvas.height - padding, padding, padding);
-    copyStrip(
-      img.width - stripW,
-      img.height - stripH,
-      stripW,
-      stripH,
-      canvas.width - padding,
-      canvas.height - padding,
-      padding,
-      padding
-    );
-
-    // Original image
-    ctx.filter = blur ? "blur(10px)" : "none";
-    ctx.drawImage(img, padding, padding);
-
-    // Edge strip preview
-    const edgeCanvas = edgeCanvasRef.current;
-    const edgeCtx = edgeCanvas.getContext("2d");
-    if (!edgeCtx) return;
-
-    edgeCanvas.width = img.width + 2 * stripW;
-    edgeCanvas.height = img.height + 2 * stripH;
-    edgeCtx.clearRect(0, 0, edgeCanvas.width, edgeCanvas.height);
-
-    edgeCtx.drawImage(img, 0, 0, img.width, stripH, stripW, 0, img.width, stripH);
-    edgeCtx.drawImage(
-      img,
-      0,
-      img.height - stripH,
-      img.width,
-      stripH,
-      stripW,
-      edgeCanvas.height - stripH,
-      img.width,
-      stripH
-    );
-    edgeCtx.drawImage(img, 0, 0, stripW, img.height, 0, stripH, stripW, img.height);
-    edgeCtx.drawImage(
-      img,
-      img.width - stripW,
-      0,
-      stripW,
-      img.height,
-      edgeCanvas.width - stripW,
-      stripH,
-      stripW,
-      img.height
-    );
-
-    updateFileSize();
-  }, [imgElement, padding, blur, edgeSize, updateFileSize]);
-
-  useEffect(() => {
-    redraw();
-  }, [redraw]);
+  // Check if background extension mode should be available
+  const shouldShowExtendMode = originalDimensions && width && height && 
+    Math.abs((originalDimensions.width / originalDimensions.height) - (width / height)) > 0.01;
 
   const clarityNote: Record<ExportFormat, string> = {
     png: "Lossless, best clarity, larger file.",
@@ -189,148 +242,173 @@ export default function EdgeExtendBackground() {
   };
 
   return (
-<>
-<Header />
-      <Head>
-        {/* Page title */}
-        <title>Pixora | Background Extender</title>
+    <>
+      <Header />
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center justify-center p-6">
+        <h1 className="text-4xl md:text-5xl font-extrabold text-blue-900 mb-8 text-center drop-shadow-lg">
+          Image Resizer
+        </h1>
 
-        {/* Favicon */}
-        <link rel="icon" href="/favicon.PNG" />
-
-        {/* App logo for mobile/Apple devices */}
-        <link rel="apple-touch-icon" href="/favicon.PNG" />
-
-        {/* Meta description for SEO */}
-        <meta
-          name="description"
-          content="Extend your image background now"
-        />
-</Head>
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-200 flex flex-col items-center p-6">
-      <h1 className="text-4xl font-extrabold text-blue-900 mb-10 text-center">
-        Edge Repeated Background Extender
-      </h1>
-
-      <div className="bg-white/40 shadow-2xl rounded-3xl p-8 w-full max-w-xl flex flex-col gap-6">
-        <div>
-          <label className="font-semibold text-blue-900">Upload Image:</label>
+        <div className="bg-white/40 backdrop-blur-lg p-8 rounded-3xl shadow-2xl border border-blue-200 border-opacity-30 flex flex-col items-center w-full max-w-md gap-6">
           <input
             type="file"
             accept="image/*"
-            onChange={handleImageChange}
-            className="mt-2 p-2 border rounded-lg w-full"
+            onChange={handleImageUpload}
+            className="text-blue-900 cursor-pointer"
           />
-        </div>
 
-        {imgElement && (
-          <>
-            <div>
-              <label className="font-semibold text-blue-900">
-                Background Padding: {padding}px
-              </label>
-              <input
-                type="range"
-                min={10}
-                max={1000}
-                value={padding}
-                onChange={(e) => setPadding(+e.target.value)}
-                className="w-full"
+          {preview && (
+            <>
+              <img
+                src={preview}
+                alt="Preview"
+                className="w-48 h-48 object-contain rounded-xl border border-blue-200"
               />
-            </div>
 
-            <div>
-              <label className="font-semibold text-blue-900">
-                Edge Strip Size: {edgeSize}px
-              </label>
-              <input
-                type="range"
-                min={1}
-                max={
-                  imgDimensions
-                    ? Math.min(300, Math.min(imgDimensions.width, imgDimensions.height))
-                    : 300
-                }
-                value={edgeSize}
-                onChange={(e) => setEdgeSize(+e.target.value)}
-                className="w-full"
-              />
-            </div>
+              <div className="flex gap-4">
+                <div>
+                  <label className="text-sm text-blue-900">Width</label>
+                  <input
+                    type="number"
+                    value={width}
+                    onChange={(e) => setWidth(parseInt(e.target.value))}
+                    className="w-24 p-2 rounded-md border border-blue-300 text-blue-900"
+                  />
+                </div>
 
-            {/* Export Options */}
-            <div>
-              <label className="font-semibold text-blue-900">Export Format:</label>
-              <select
-                value={format}
-                onChange={(e) => setFormat(e.target.value as ExportFormat)}
-                className="p-2 border rounded-lg w-full mt-2"
-              >
-                <option value="png">PNG</option>
-                <option value="jpeg">JPEG</option>
-                <option value="jpg">JPG</option>
-                <option value="webp">WebP</option>
-              </select>
-            </div>
-
-            {(format === "jpeg" || format === "jpg" || format === "webp") && (
-              <div>
-                <label className="font-semibold text-blue-900">
-                  Quality: {Math.round(quality * 100)}%
-                </label>
-                <input
-                  type="range"
-                  min={10}
-                  max={100}
-                  value={quality * 100}
-                  onChange={(e) => setQuality(+e.target.value / 100)}
-                  className="w-full"
-                />
+                <div>
+                  <label className="text-sm text-blue-900">Height</label>
+                  <input
+                    type="number"
+                    value={height}
+                    onChange={(e) => setHeight(parseInt(e.target.value))}
+                    className="w-24 p-2 rounded-md border border-blue-300 text-blue-900"
+                  />
+                </div>
               </div>
-            )}
 
-            <div className="text-sm text-blue-900 bg-white/60 rounded-lg p-3 shadow-inner">
-              <p>
-                <strong>Final Size:</strong>{" "}
-                {imgDimensions ? imgDimensions.width + 2 * padding : 0} ×{" "}
-                {imgDimensions ? imgDimensions.height + 2 * padding : 0} px
-              </p>
-              <p>
-                <strong>Estimated File:</strong> {estimatedSize}
-              </p>
-              <p>
-                <strong>Clarity:</strong> {clarityNote[format]}
-              </p>
+              {/* Mode selector - only show when aspect ratios differ */}
+              {shouldShowExtendMode && (
+                <div className="w-full">
+                  <label className="text-sm text-blue-900 block mb-2">Resize Mode</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        value="stretch"
+                        checked={mode === "stretch"}
+                        onChange={(e) => setMode(e.target.value as ResizeMode)}
+                        className="mr-2"
+                      />
+                      Stretch
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        value="extend"
+                        checked={mode === "extend"}
+                        onChange={(e) => setMode(e.target.value as ResizeMode)}
+                        className="mr-2"
+                      />
+                      Background Extender
+                    </label>
+                  </div>
+                  
+                  {/* Background extender options */}
+                  {mode === "extend" && (
+                    <div className="mt-4 space-y-4">
+                      <div>
+                        <label className="text-sm text-blue-900">
+                          Edge Strip Size: {edgeSize}px
+                        </label>
+                        <input
+                          type="range"
+                          min={1}
+                          max={
+                            originalDimensions
+                              ? Math.min(300, Math.min(originalDimensions.width, originalDimensions.height))
+                              : 300
+                          }
+                          value={edgeSize}
+                          onChange={(e) => setEdgeSize(parseInt(e.target.value))}
+                          className="w-full mt-2"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm text-blue-900">Export Format:</label>
+                        <select
+                          value={format}
+                          onChange={(e) => setFormat(e.target.value as ExportFormat)}
+                          className="p-2 rounded-md border border-blue-300 text-blue-900 w-full mt-1"
+                        >
+                          <option value="png">PNG</option>
+                          <option value="jpeg">JPEG</option>
+                          <option value="jpg">JPG</option>
+                          <option value="webp">WebP</option>
+                        </select>
+                      </div>
+
+                      {(format === "jpeg" || format === "jpg" || format === "webp") && (
+                        <div>
+                          <label className="text-sm text-blue-900">
+                            Quality: {Math.round(quality * 100)}%
+                          </label>
+                          <input
+                            type="range"
+                            min={10}
+                            max={100}
+                            value={quality * 100}
+                            onChange={(e) => setQuality(parseInt(e.target.value) / 100)}
+                            className="w-full mt-2"
+                          />
+                        </div>
+                      )}
+
+                      {estimatedSize && (
+                        <div className="text-xs text-blue-600 bg-white/60 rounded-lg p-2">
+                          <p><strong>Estimated Size:</strong> {estimatedSize}</p>
+                          <p><strong>Clarity:</strong> {clarityNote[format]}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                onClick={handleResize}
+                className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-2 rounded-xl font-semibold shadow-md transition-all"
+              >
+                Resize Image
+              </button>
+            </>
+          )}
+
+          {resized && (
+            <div className="flex flex-col items-center gap-4 mt-6">
+              <img
+                src={resized}
+                alt="Resized"
+                className="w-48 h-48 object-contain rounded-xl border border-blue-200"
+              />
+              <button
+                onClick={handleDownload}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl font-semibold shadow-md transition-all"
+              >
+                Download Resized Image
+              </button>
             </div>
-
-            <button
-              onClick={handleDownload}
-              disabled={downloading}
-              className={`${
-                downloading
-                  ? "bg-gray-400 cursor-wait"
-                  : "bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
-              } text-white font-bold py-3 rounded-2xl shadow-xl mt-4 transition`}
-            >
-              {downloading ? "Downloading..." : `Download as ${format.toUpperCase()}`}
-            </button>
-          </>
-        )}
-      </div>
-
-      {imgElement && (
-        <div className="mt-10 flex flex-col items-center gap-6 w-full max-w-xl">
-          <div className="bg-white/40 p-6 rounded-3xl shadow-xl">
-            <h2 className="text-2xl font-semibold text-blue-900">Live Preview</h2>
-            <canvas ref={canvasRef} className="rounded-2xl border border-blue-300 max-w-full mt-4" />
-          </div>
-
-          <div className="bg-white/40 p-6 rounded-3xl shadow-xl">
-            <h2 className="text-2xl font-semibold text-blue-900">Edge Strip Preview</h2>
-            <canvas ref={edgeCanvasRef} className="rounded-2xl border border-blue-300 max-w-full mt-4" />
-          </div>
+          )}
         </div>
-      )}
-    </div>
-</>
+
+        {/* Hidden canvas for file size estimation */}
+        <canvas ref={canvasRef} className="hidden" />
+
+        <p className="text-blue-900 text-sm mt-12">
+          Resize images instantly — no quality loss, no waiting.
+        </p>
+      </div>
+    </>
   );
 }

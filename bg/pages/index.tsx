@@ -39,6 +39,16 @@ export default function Home() {
           </div>
         </Link>
 
+{/* Image Resizer */}
+<Link href="/image-resizer" className="transform hover:scale-105 transition-all">
+  <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 flex flex-col items-center gap-4 border border-blue-200 border-opacity-30 hover:shadow-[0_0_30px_rgba(59,130,246,0.4)]">
+    <h2 className="text-2xl font-semibold text-blue-900">Image Resizer</h2>
+    <p className="text-blue-900 text-center text-sm">
+      Resize your images to exact dimensions with instant preview and download.
+    </p>
+  </div>
+</Link>
+
         {/* Civil ID PDF Maker */}
         <Link href="/civil-id" className="transform hover:scale-105 transition-all">
           <div className="bg-white/40 backdrop-blur-md shadow-2xl rounded-3xl p-8 flex flex-col items-center gap-4 border border-blue-200 border-opacity-30 hover:shadow-[0_0_30px_rgba(59,130,246,0.4)]">

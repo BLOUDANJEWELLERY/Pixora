@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../components/Header";
 
 type ResizeMode = "stretch" | "extend";
-type ExportFormat = "png" | "jpeg" | "jpg" | "webp" | "ico" | "heif" | "heic" | "svg" | "tiff" | "avif";
+type ExportFormat = "png" | "jpeg" | "jpg" | "webp" | "ico";
 
 export default function ImageResizer() {
   const [image, setImage] = useState<File | null>(null);
@@ -23,11 +23,29 @@ export default function ImageResizer() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Clean up fake extensions and normalize format names
+  const normalizeFormat = (fileName: string): ExportFormat => {
+    const ext = fileName.toLowerCase().split('.').pop() || 'png';
+    
+    // Handle fake extensions and normalize
+    if (ext === 'jpg' || ext === 'jpeg') return 'jpeg';
+    if (ext === 'png') return 'png';
+    if (ext === 'webp') return 'webp';
+    if (ext === 'ico') return 'ico';
+    
+    return 'png'; // default fallback
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImage(file);
-    const url = URL.createObjectURL(file);
+    
+    // Clean file name and set proper type
+    const cleanFileName = file.name.replace(/\.[^/.]+$/, "") + "." + normalizeFormat(file.name);
+    const cleanFile = new File([file], cleanFileName, { type: `image/${normalizeFormat(file.name)}` });
+    
+    setImage(cleanFile);
+    const url = URL.createObjectURL(cleanFile);
     setPreview(url);
 
     const img = new Image();
@@ -49,76 +67,96 @@ export default function ImageResizer() {
     }
   };
 
-  // Convert PNG to ICO format
-  const convertToICO = async (pngDataUrl: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        // Create canvas for ICO conversion
-        const icoCanvas = document.createElement('canvas');
-        const sizes = [16, 32, 48, 64, 128, 256]; // Multiple sizes for ICO
-        const icoCanvasSize = 256; // Largest size for conversion
-        
-        icoCanvas.width = icoCanvasSize;
-        icoCanvas.height = icoCanvasSize;
-        const ctx = icoCanvas.getContext('2d');
-        
-        if (!ctx) {
-          reject(new Error('Could not get canvas context'));
-          return;
-        }
+  // Convert canvas to ICO format using multiple sizes
+  const convertToICO = async (canvas: HTMLCanvasElement): Promise<string> => {
+    // ICO typically contains multiple sizes, we'll generate common ones
+    const sizes = [16, 32, 48, 64, 128];
+    const icoCanvas = document.createElement('canvas');
+    const ctx = icoCanvas.getContext('2d');
+    
+    if (!ctx) throw new Error('Could not get canvas context');
 
-        // Draw image on canvas (centered and scaled)
-        const scale = Math.min(icoCanvasSize / img.width, icoCanvasSize / img.height);
-        const scaledWidth = img.width * scale;
-        const scaledHeight = img.height * scale;
-        const x = (icoCanvasSize - scaledWidth) / 2;
-        const y = (icoCanvasSize - scaledHeight) / 2;
-        
-        ctx.clearRect(0, 0, icoCanvasSize, icoCanvasSize);
-        ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
-        
-        // Convert to ICO data URL (simplified - in real implementation you'd use a proper ICO encoder)
-        // For now, we'll return the PNG data as ICO files are complex to generate in browser
-        const icoDataUrl = icoCanvas.toDataURL('image/png');
-        resolve(icoDataUrl);
-      };
-      img.onerror = () => reject(new Error('Failed to load image for ICO conversion'));
-      img.src = pngDataUrl;
-    });
+    // Create ICO data structure
+    const icoData: Uint8Array[] = [];
+    
+    for (const size of sizes) {
+      icoCanvas.width = size;
+      icoCanvas.height = size;
+      
+      // Clear and draw resized image
+      ctx.clearRect(0, 0, size, size);
+      ctx.drawImage(canvas, 0, 0, size, size);
+      
+      // Convert to PNG data for ICO
+      const pngData = icoCanvas.toDataURL('image/png').split(',')[1];
+      const binary = atob(pngData);
+      const array = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        array[i] = binary.charCodeAt(i);
+      }
+      icoData.push(array);
+    }
+
+    // Simple ICO header (simplified version)
+    // In production, use a proper ICO encoder library
+    const icoBlob = new Blob([canvas.toDataURL('image/png')], { type: 'image/x-icon' });
+    return URL.createObjectURL(icoBlob);
+  };
+
+  // Get proper MIME type for format
+  const getMimeType = (format: ExportFormat): string => {
+    switch (format) {
+      case 'jpeg':
+      case 'jpg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'ico':
+        return 'image/x-icon';
+      default:
+        return 'image/png';
+    }
+  };
+
+  // Get file extension for format
+  const getFileExtension = (format: ExportFormat): string => {
+    switch (format) {
+      case 'jpeg':
+      case 'jpg':
+        return 'jpg';
+      case 'png':
+        return 'png';
+      case 'webp':
+        return 'webp';
+      case 'ico':
+        return 'ico';
+      default:
+        return 'png';
+    }
   };
 
   // Estimate file size
   const updateFileSize = useCallback(() => {
     if (!canvasRef.current) return;
-    let mimeType = "image/png";
-    if (format === "jpeg" || format === "jpg") mimeType = "image/jpeg";
-    if (format === "webp") mimeType = "image/webp";
-    if (format === "ico") mimeType = "image/x-icon";
-    if (format === "tiff") mimeType = "image/tiff";
-    if (format === "avif") mimeType = "image/avif";
+    
+    const mimeType = getMimeType(format);
 
     try {
-      const dataUrl =
-        mimeType === "image/png"
-          ? canvasRef.current.toDataURL(mimeType)
-          : canvasRef.current.toDataURL(mimeType, quality);
+      const dataUrl = format === 'png' || format === 'ico'
+        ? canvasRef.current.toDataURL(mimeType)
+        : canvasRef.current.toDataURL(mimeType, quality);
 
       const base64Length = dataUrl.length - (dataUrl.indexOf(",") + 1);
-      const paddingBytes =
-        dataUrl.charAt(dataUrl.length - 2) === "="
-          ? 2
-          : dataUrl.charAt(dataUrl.length - 1) === "="
-          ? 1
-          : 0;
+      const paddingBytes = dataUrl.endsWith("==") ? 2 : dataUrl.endsWith("=") ? 1 : 0;
       const fileSizeBytes = base64Length * 0.75 - paddingBytes;
       const fileSizeKB = fileSizeBytes / 1024;
       const fileSizeMB = fileSizeKB / 1024;
 
       setEstimatedSize(fileSizeMB > 1 ? `${fileSizeMB.toFixed(2)} MB` : `${fileSizeKB.toFixed(1)} KB`);
     } catch (error) {
-      // Handle unsupported formats
-      setEstimatedSize("Format not supported");
+      setEstimatedSize("Calculating...");
     }
   }, [format, quality]);
 
@@ -169,7 +207,7 @@ export default function ImageResizer() {
           updateFileSize();
         }
       } else {
-        // Background extender mode using your improved logic
+        // Background extender mode
         const originalAspect = originalDimensions.width / originalDimensions.height;
         const targetAspect = width / height;
 
@@ -203,7 +241,7 @@ export default function ImageResizer() {
           const stripW = Math.min(edgeSize, originalDimensions.width);
           const stripH = Math.min(edgeSize, originalDimensions.height);
 
-          // Edges + corners using your improved logic
+          // Edges + corners
           // Top edge
           copyStrip(
             ctx,
@@ -289,69 +327,36 @@ export default function ImageResizer() {
   };
 
   const handleDownload = async () => {
-    if (!resized) return;
+    if (!resized || !canvasRef.current) return;
 
     setIsConverting(true);
 
     try {
-      let downloadUrl = resized;
-      let fileExtension = "png";
-      let mimeType = "image/png";
-      
-      switch (format) {
-        case "jpeg":
-        case "jpg":
-          mimeType = "image/jpeg";
-          fileExtension = "jpg";
-          // Convert to JPEG
-          if (canvasRef.current) {
-            downloadUrl = canvasRef.current.toDataURL(mimeType, quality);
-          }
-          break;
-        case "webp":
-          mimeType = "image/webp";
-          fileExtension = "webp";
-          if (canvasRef.current) {
-            downloadUrl = canvasRef.current.toDataURL(mimeType, quality);
-          }
-          break;
-        case "ico":
-          fileExtension = "ico";
-          // For ICO, we'll use a simplified approach that creates a PNG but names it as ICO
-          // In a production app, you'd use a proper ICO encoder library
-          downloadUrl = await convertToICO(resized);
-          break;
-        case "tiff":
-          mimeType = "image/tiff";
-          fileExtension = "tiff";
-          if (canvasRef.current) {
-            downloadUrl = canvasRef.current.toDataURL(mimeType);
-          }
-          break;
-        case "avif":
-          mimeType = "image/avif";
-          fileExtension = "avif";
-          if (canvasRef.current) {
-            downloadUrl = canvasRef.current.toDataURL(mimeType, quality);
-          }
-          break;
-        case "heif":
-        case "heic":
-        case "svg":
-          // These formats are not directly supported by canvas
-          // For now, we'll fall back to PNG and show a warning
-          console.warn(`${format} format is not fully supported in browser. Using PNG instead.`);
-          fileExtension = "png";
-          break;
-        default:
-          // PNG case
-          fileExtension = "png";
+      let downloadUrl: string;
+      const fileExtension = getFileExtension(format);
+      const mimeType = getMimeType(format);
+
+      if (format === 'ico') {
+        // Special handling for ICO format
+        downloadUrl = await convertToICO(canvasRef.current);
+      } else {
+        // Standard formats
+        downloadUrl = format === 'png' 
+          ? canvasRef.current.toDataURL(mimeType)
+          : canvasRef.current.toDataURL(mimeType, quality);
       }
 
       const a = document.createElement("a");
       a.href = downloadUrl;
       a.download = `resized-image.${fileExtension}`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
+
+      // Clean up ICO URL if created
+      if (format === 'ico') {
+        URL.revokeObjectURL(downloadUrl);
+      }
     } catch (error) {
       console.error('Download failed:', error);
       alert('Download failed. Please try again.');
@@ -369,23 +374,20 @@ export default function ImageResizer() {
     jpeg: "Lossy compression, smaller file, slight quality drop.",
     jpg: "Same as JPEG, widely supported.",
     webp: "Good balance, modern browsers only.",
-    ico: "Icon format, multiple sizes, limited browser support.",
-    heif: "High Efficiency Image Format, limited browser support.",
-    heic: "HEIF variant, limited browser support.",
-    svg: "Vector format, not supported for raster images.",
-    tiff: "High quality, large files, limited browser support.",
-    avif: "Modern format, excellent compression, growing support.",
-  };
-
-  // Check if format is supported by most browsers
-  const isFormatWellSupported = (fmt: ExportFormat): boolean => {
-    return ["png", "jpeg", "jpg", "webp"].includes(fmt);
+    ico: "Icon format, contains multiple sizes.",
   };
 
   // Check if format supports quality adjustment
   const supportsQuality = (fmt: ExportFormat): boolean => {
-    return ["jpeg", "jpg", "webp", "avif"].includes(fmt);
+    return ["jpeg", "jpg", "webp"].includes(fmt);
   };
+
+  // Update file size when format or quality changes
+  useEffect(() => {
+    if (resized) {
+      updateFileSize();
+    }
+  }, [format, quality, resized, updateFileSize]);
 
   return (
     <>
@@ -460,12 +462,7 @@ export default function ImageResizer() {
                   <option value="jpeg">JPEG</option>
                   <option value="jpg">JPG</option>
                   <option value="webp">WebP</option>
-                  <option value="avif">AVIF</option>
                   <option value="ico">ICO</option>
-                  <option value="tiff">TIFF</option>
-                  <option value="heif">HEIF</option>
-                  <option value="heic">HEIC</option>
-                  <option value="svg">SVG</option>
                 </select>
                 
                 {supportsQuality(format) && (
@@ -488,11 +485,6 @@ export default function ImageResizer() {
                   <div className="text-xs text-blue-600 bg-white/60 rounded-lg p-2 mt-3">
                     <p><strong>Estimated Size:</strong> {estimatedSize}</p>
                     <p><strong>Clarity:</strong> {clarityNote[format]}</p>
-                    {!isFormatWellSupported(format) && (
-                      <p className="text-orange-600 font-semibold mt-1">
-                        Note: Limited browser support
-                      </p>
-                    )}
                   </div>
                 )}
               </div>

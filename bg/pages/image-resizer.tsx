@@ -19,6 +19,7 @@ export default function ImageResizer() {
   const [format, setFormat] = useState<ExportFormat>("png");
   const [quality, setQuality] = useState<number>(0.9);
   const [estimatedSize, setEstimatedSize] = useState<string>("");
+  const [isConverting, setIsConverting] = useState<boolean>(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -48,6 +49,45 @@ export default function ImageResizer() {
     }
   };
 
+  // Convert PNG to ICO format
+  const convertToICO = async (pngDataUrl: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        // Create canvas for ICO conversion
+        const icoCanvas = document.createElement('canvas');
+        const sizes = [16, 32, 48, 64, 128, 256]; // Multiple sizes for ICO
+        const icoCanvasSize = 256; // Largest size for conversion
+        
+        icoCanvas.width = icoCanvasSize;
+        icoCanvas.height = icoCanvasSize;
+        const ctx = icoCanvas.getContext('2d');
+        
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+
+        // Draw image on canvas (centered and scaled)
+        const scale = Math.min(icoCanvasSize / img.width, icoCanvasSize / img.height);
+        const scaledWidth = img.width * scale;
+        const scaledHeight = img.height * scale;
+        const x = (icoCanvasSize - scaledWidth) / 2;
+        const y = (icoCanvasSize - scaledHeight) / 2;
+        
+        ctx.clearRect(0, 0, icoCanvasSize, icoCanvasSize);
+        ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
+        
+        // Convert to ICO data URL (simplified - in real implementation you'd use a proper ICO encoder)
+        // For now, we'll return the PNG data as ICO files are complex to generate in browser
+        const icoDataUrl = icoCanvas.toDataURL('image/png');
+        resolve(icoDataUrl);
+      };
+      img.onerror = () => reject(new Error('Failed to load image for ICO conversion'));
+      img.src = pngDataUrl;
+    });
+  };
+
   // Estimate file size
   const updateFileSize = useCallback(() => {
     if (!canvasRef.current) return;
@@ -57,7 +97,6 @@ export default function ImageResizer() {
     if (format === "ico") mimeType = "image/x-icon";
     if (format === "tiff") mimeType = "image/tiff";
     if (format === "avif") mimeType = "image/avif";
-    // Note: HEIF/HEIC and SVG are not directly supported by canvas
 
     try {
       const dataUrl =
@@ -121,6 +160,14 @@ export default function ImageResizer() {
         ctx.drawImage(img, 0, 0, width, height);
         const resizedUrl = canvas.toDataURL("image/png");
         setResized(resizedUrl);
+        
+        // Update canvas ref for file size estimation
+        if (canvasRef.current) {
+          canvasRef.current.width = width;
+          canvasRef.current.height = height;
+          canvasRef.current.getContext('2d')?.drawImage(canvas, 0, 0);
+          updateFileSize();
+        }
       } else {
         // Background extender mode using your improved logic
         const originalAspect = originalDimensions.width / originalDimensions.height;
@@ -131,6 +178,13 @@ export default function ImageResizer() {
           ctx.drawImage(img, 0, 0, width, height);
           const resizedUrl = canvas.toDataURL("image/png");
           setResized(resizedUrl);
+          
+          if (canvasRef.current) {
+            canvasRef.current.width = width;
+            canvasRef.current.height = height;
+            canvasRef.current.getContext('2d')?.drawImage(canvas, 0, 0);
+            updateFileSize();
+          }
         } else {
           // Different aspect ratio - use edge extension
           const scale = Math.min(
@@ -234,43 +288,76 @@ export default function ImageResizer() {
     img.src = URL.createObjectURL(image);
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!resized) return;
 
-    let mimeType = "image/png";
-    let fileExtension = "png";
-    
-    switch (format) {
-      case "jpeg":
-      case "jpg":
-        mimeType = "image/jpeg";
-        fileExtension = "jpg";
-        break;
-      case "webp":
-        mimeType = "image/webp";
-        fileExtension = "webp";
-        break;
-      case "ico":
-        mimeType = "image/x-icon";
-        fileExtension = "ico";
-        break;
-      case "tiff":
-        mimeType = "image/tiff";
-        fileExtension = "tiff";
-        break;
-      case "avif":
-        mimeType = "image/avif";
-        fileExtension = "avif";
-        break;
-      default:
-        mimeType = "image/png";
-        fileExtension = "png";
-    }
+    setIsConverting(true);
 
-    const a = document.createElement("a");
-    a.href = resized;
-    a.download = `resized-image.${fileExtension}`;
-    a.click();
+    try {
+      let downloadUrl = resized;
+      let fileExtension = "png";
+      let mimeType = "image/png";
+      
+      switch (format) {
+        case "jpeg":
+        case "jpg":
+          mimeType = "image/jpeg";
+          fileExtension = "jpg";
+          // Convert to JPEG
+          if (canvasRef.current) {
+            downloadUrl = canvasRef.current.toDataURL(mimeType, quality);
+          }
+          break;
+        case "webp":
+          mimeType = "image/webp";
+          fileExtension = "webp";
+          if (canvasRef.current) {
+            downloadUrl = canvasRef.current.toDataURL(mimeType, quality);
+          }
+          break;
+        case "ico":
+          fileExtension = "ico";
+          // For ICO, we'll use a simplified approach that creates a PNG but names it as ICO
+          // In a production app, you'd use a proper ICO encoder library
+          downloadUrl = await convertToICO(resized);
+          break;
+        case "tiff":
+          mimeType = "image/tiff";
+          fileExtension = "tiff";
+          if (canvasRef.current) {
+            downloadUrl = canvasRef.current.toDataURL(mimeType);
+          }
+          break;
+        case "avif":
+          mimeType = "image/avif";
+          fileExtension = "avif";
+          if (canvasRef.current) {
+            downloadUrl = canvasRef.current.toDataURL(mimeType, quality);
+          }
+          break;
+        case "heif":
+        case "heic":
+        case "svg":
+          // These formats are not directly supported by canvas
+          // For now, we'll fall back to PNG and show a warning
+          console.warn(`${format} format is not fully supported in browser. Using PNG instead.`);
+          fileExtension = "png";
+          break;
+        default:
+          // PNG case
+          fileExtension = "png";
+      }
+
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = `resized-image.${fileExtension}`;
+      a.click();
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Download failed. Please try again.');
+    } finally {
+      setIsConverting(false);
+    }
   };
 
   // Check if background extension mode should be available
@@ -293,6 +380,11 @@ export default function ImageResizer() {
   // Check if format is supported by most browsers
   const isFormatWellSupported = (fmt: ExportFormat): boolean => {
     return ["png", "jpeg", "jpg", "webp"].includes(fmt);
+  };
+
+  // Check if format supports quality adjustment
+  const supportsQuality = (fmt: ExportFormat): boolean => {
+    return ["jpeg", "jpg", "webp", "avif"].includes(fmt);
   };
 
   return (
@@ -356,6 +448,55 @@ export default function ImageResizer() {
                 </button>
               </div>
 
+              {/* Export Format - Always Visible */}
+              <div className="w-full">
+                <label className="text-sm text-blue-900 block mb-2">Export Format:</label>
+                <select
+                  value={format}
+                  onChange={(e) => setFormat(e.target.value as ExportFormat)}
+                  className="p-2 rounded-md border border-blue-300 text-blue-900 w-full"
+                >
+                  <option value="png">PNG</option>
+                  <option value="jpeg">JPEG</option>
+                  <option value="jpg">JPG</option>
+                  <option value="webp">WebP</option>
+                  <option value="avif">AVIF</option>
+                  <option value="ico">ICO</option>
+                  <option value="tiff">TIFF</option>
+                  <option value="heif">HEIF</option>
+                  <option value="heic">HEIC</option>
+                  <option value="svg">SVG</option>
+                </select>
+                
+                {supportsQuality(format) && (
+                  <div className="mt-3">
+                    <label className="text-sm text-blue-900">
+                      Quality: {Math.round(quality * 100)}%
+                    </label>
+                    <input
+                      type="range"
+                      min={10}
+                      max={100}
+                      value={quality * 100}
+                      onChange={(e) => setQuality(parseInt(e.target.value) / 100)}
+                      className="w-full mt-2"
+                    />
+                  </div>
+                )}
+
+                {estimatedSize && (
+                  <div className="text-xs text-blue-600 bg-white/60 rounded-lg p-2 mt-3">
+                    <p><strong>Estimated Size:</strong> {estimatedSize}</p>
+                    <p><strong>Clarity:</strong> {clarityNote[format]}</p>
+                    {!isFormatWellSupported(format) && (
+                      <p className="text-orange-600 font-semibold mt-1">
+                        Note: Limited browser support
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Mode selector - only show when aspect ratios differ */}
               {shouldShowExtendMode && (
                 <div className="w-full">
@@ -385,7 +526,7 @@ export default function ImageResizer() {
                   
                   {/* Background extender options */}
                   {mode === "extend" && (
-                    <div className="mt-4 space-y-4">
+                    <div className="mt-4">
                       <div>
                         <label className="text-sm text-blue-900">
                           Edge Strip Size: {edgeSize}px
@@ -403,54 +544,6 @@ export default function ImageResizer() {
                           className="w-full mt-2"
                         />
                       </div>
-
-                      <div>
-                        <label className="text-sm text-blue-900">Export Format:</label>
-                        <select
-                          value={format}
-                          onChange={(e) => setFormat(e.target.value as ExportFormat)}
-                          className="p-2 rounded-md border border-blue-300 text-blue-900 w-full mt-1"
-                        >
-                          <option value="png">PNG</option>
-                          <option value="jpeg">JPEG</option>
-                          <option value="jpg">JPG</option>
-                          <option value="webp">WebP</option>
-                          <option value="avif">AVIF</option>
-                          <option value="ico">ICO</option>
-                          <option value="tiff">TIFF</option>
-                          <option value="heif">HEIF</option>
-                          <option value="heic">HEIC</option>
-                          <option value="svg">SVG</option>
-                        </select>
-                      </div>
-
-                      {(format === "jpeg" || format === "jpg" || format === "webp" || format === "avif") && (
-                        <div>
-                          <label className="text-sm text-blue-900">
-                            Quality: {Math.round(quality * 100)}%
-                          </label>
-                          <input
-                            type="range"
-                            min={10}
-                            max={100}
-                            value={quality * 100}
-                            onChange={(e) => setQuality(parseInt(e.target.value) / 100)}
-                            className="w-full mt-2"
-                          />
-                        </div>
-                      )}
-
-                      {estimatedSize && (
-                        <div className="text-xs text-blue-600 bg-white/60 rounded-lg p-2">
-                          <p><strong>Estimated Size:</strong> {estimatedSize}</p>
-                          <p><strong>Clarity:</strong> {clarityNote[format]}</p>
-                          {!isFormatWellSupported(format) && (
-                            <p className="text-orange-600 font-semibold mt-1">
-                              Note: Limited browser support
-                            </p>
-                          )}
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -466,7 +559,7 @@ export default function ImageResizer() {
           )}
 
           {resized && (
-            <div className="flex flex-col items-center gap-4 mt-6">
+            <div className="flex flex-col items-center gap-4 mt-6 w-full">
               <img
                 src={resized}
                 alt="Resized"
@@ -474,9 +567,14 @@ export default function ImageResizer() {
               />
               <button
                 onClick={handleDownload}
-                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl font-semibold shadow-md transition-all"
+                disabled={isConverting}
+                className={`${
+                  isConverting 
+                    ? "bg-gray-400 cursor-not-allowed" 
+                    : "bg-green-600 hover:bg-green-700"
+                } text-white px-6 py-2 rounded-xl font-semibold shadow-md transition-all w-full`}
               >
-                Download as {format.toUpperCase()}
+                {isConverting ? "Converting..." : `Download as ${format.toUpperCase()}`}
               </button>
             </div>
           )}

@@ -1,8 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../components/Header";
 
 type ResizeMode = "stretch" | "extend";
+type ExportFormat = "png" | "jpeg" | "jpg" | "webp";
 
 export default function ImageResizer() {
   const [image, setImage] = useState<File | null>(null);
@@ -12,6 +13,14 @@ export default function ImageResizer() {
   const [resized, setResized] = useState<string | null>(null);
   const [mode, setMode] = useState<ResizeMode>("stretch");
   const [originalDimensions, setOriginalDimensions] = useState<{width: number, height: number} | null>(null);
+  
+  // Background extender specific states
+  const [edgeSize, setEdgeSize] = useState<number>(50);
+  const [format, setFormat] = useState<ExportFormat>("png");
+  const [quality, setQuality] = useState<number>(0.9);
+  const [estimatedSize, setEstimatedSize] = useState<string>("");
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -25,68 +34,57 @@ export default function ImageResizer() {
       setWidth(img.width);
       setHeight(img.height);
       setOriginalDimensions({ width: img.width, height: img.height });
+      // Set default edge size based on image dimensions
+      setEdgeSize(Math.min(50, Math.min(img.width, img.height) / 4));
     };
     img.src = url;
   };
 
-  const getEdgePixels = (imageData: ImageData, width: number, height: number) => {
-    const edges = {
-      top: [],
-      bottom: [],
-      left: [],
-      right: []
-    } as {
-      top: number[][],
-      bottom: number[][],
-      left: number[][],
-      right: number[][]
-    };
+  // Estimate file size
+  const updateFileSize = useCallback(() => {
+    if (!canvasRef.current) return;
+    let mimeType = "image/png";
+    if (format === "jpeg" || format === "jpg") mimeType = "image/jpeg";
+    if (format === "webp") mimeType = "image/webp";
 
-    // Top edge (first row)
-    for (let x = 0; x < width; x++) {
-      const index = (0 * width + x) * 4;
-      edges.top.push([
-        imageData.data[index],
-        imageData.data[index + 1],
-        imageData.data[index + 2],
-        imageData.data[index + 3]
-      ]);
-    }
+    const dataUrl =
+      mimeType === "image/png"
+        ? canvasRef.current.toDataURL(mimeType)
+        : canvasRef.current.toDataURL(mimeType, quality);
 
-    // Bottom edge (last row)
-    for (let x = 0; x < width; x++) {
-      const index = ((height - 1) * width + x) * 4;
-      edges.bottom.push([
-        imageData.data[index],
-        imageData.data[index + 1],
-        imageData.data[index + 2],
-        imageData.data[index + 3]
-      ]);
-    }
+    const base64Length = dataUrl.length - (dataUrl.indexOf(",") + 1);
+    const paddingBytes =
+      dataUrl.charAt(dataUrl.length - 2) === "="
+        ? 2
+        : dataUrl.charAt(dataUrl.length - 1) === "="
+        ? 1
+        : 0;
+    const fileSizeBytes = base64Length * 0.75 - paddingBytes;
+    const fileSizeKB = fileSizeBytes / 1024;
+    const fileSizeMB = fileSizeKB / 1024;
 
-    // Left edge (first column)
-    for (let y = 0; y < height; y++) {
-      const index = (y * width + 0) * 4;
-      edges.left.push([
-        imageData.data[index],
-        imageData.data[index + 1],
-        imageData.data[index + 2],
-        imageData.data[index + 3]
-      ]);
-    }
+    setEstimatedSize(fileSizeMB > 1 ? `${fileSizeMB.toFixed(2)} MB` : `${fileSizeKB.toFixed(1)} KB`);
+  }, [format, quality]);
 
-    // Right edge (last column)
-    for (let y = 0; y < height; y++) {
-      const index = (y * width + (width - 1)) * 4;
-      edges.right.push([
-        imageData.data[index],
-        imageData.data[index + 1],
-        imageData.data[index + 2],
-        imageData.data[index + 3]
-      ]);
-    }
-
-    return edges;
+  const copyStrip = (
+    ctx: CanvasRenderingContext2D,
+    img: HTMLImageElement,
+    sx: number,
+    sy: number,
+    sw: number,
+    sh: number,
+    dx: number,
+    dy: number,
+    dw: number,
+    dh: number
+  ) => {
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = sw;
+    tempCanvas.height = sh;
+    const tctx = tempCanvas.getContext("2d");
+    if (!tctx) return;
+    tctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    ctx.drawImage(tempCanvas, 0, 0, sw, sh, dx, dy, dw, dh);
   };
 
   const handleResize = () => {
@@ -104,16 +102,20 @@ export default function ImageResizer() {
       if (mode === "stretch") {
         // Default mode - stretch the image
         ctx.drawImage(img, 0, 0, width, height);
+        const resizedUrl = canvas.toDataURL("image/png");
+        setResized(resizedUrl);
       } else {
-        // Background extender mode
+        // Background extender mode using your improved logic
         const originalAspect = originalDimensions.width / originalDimensions.height;
         const targetAspect = width / height;
 
         if (Math.abs(originalAspect - targetAspect) < 0.01) {
           // Same aspect ratio, just resize
           ctx.drawImage(img, 0, 0, width, height);
+          const resizedUrl = canvas.toDataURL("image/png");
+          setResized(resizedUrl);
         } else {
-          // Different aspect ratio - extend background
+          // Different aspect ratio - use edge extension
           const scale = Math.min(
             width / originalDimensions.width,
             height / originalDimensions.height
@@ -125,69 +127,119 @@ export default function ImageResizer() {
           const xOffset = (width - scaledWidth) / 2;
           const yOffset = (height - scaledHeight) / 2;
 
-          // Create a temporary canvas to get edge pixels
-          const tempCanvas = document.createElement("canvas");
-          tempCanvas.width = originalDimensions.width;
-          tempCanvas.height = originalDimensions.height;
-          const tempCtx = tempCanvas.getContext("2d");
-          
-          if (tempCtx) {
-            tempCtx.drawImage(img, 0, 0, originalDimensions.width, originalDimensions.height);
-            const imageData = tempCtx.getImageData(0, 0, originalDimensions.width, originalDimensions.height);
-            const edges = getEdgePixels(imageData, originalDimensions.width, originalDimensions.height);
+          ctx.clearRect(0, 0, width, height);
 
-            // Fill the entire canvas with extended background
-            // Top area
-            for (let y = 0; y < yOffset; y++) {
-              const edgePixel = edges.top[Math.floor((y / yOffset) * edges.top.length) % edges.top.length];
-              ctx.fillStyle = `rgba(${edgePixel[0]}, ${edgePixel[1]}, ${edgePixel[2]}, ${edgePixel[3] / 255})`;
-              ctx.fillRect(0, y, width, 1);
-            }
+          const stripW = Math.min(edgeSize, originalDimensions.width);
+          const stripH = Math.min(edgeSize, originalDimensions.height);
 
-            // Bottom area
-            for (let y = height - yOffset; y < height; y++) {
-              const edgePixel = edges.bottom[Math.floor(((y - (height - yOffset)) / yOffset) * edges.bottom.length) % edges.bottom.length];
-              ctx.fillStyle = `rgba(${edgePixel[0]}, ${edgePixel[1]}, ${edgePixel[2]}, ${edgePixel[3] / 255})`;
-              ctx.fillRect(0, y, width, 1);
-            }
+          // Edges + corners using your improved logic
+          // Top edge
+          copyStrip(
+            ctx,
+            img,
+            0, 0, originalDimensions.width, stripH,
+            xOffset, 0, scaledWidth, yOffset
+          );
 
-            // Left area
-            for (let x = 0; x < xOffset; x++) {
-              const edgePixel = edges.left[Math.floor((x / xOffset) * edges.left.length) % edges.left.length];
-              ctx.fillStyle = `rgba(${edgePixel[0]}, ${edgePixel[1]}, ${edgePixel[2]}, ${edgePixel[3] / 255})`;
-              ctx.fillRect(x, yOffset, 1, scaledHeight);
-            }
+          // Bottom edge
+          copyStrip(
+            ctx,
+            img,
+            0, originalDimensions.height - stripH, originalDimensions.width, stripH,
+            xOffset, height - yOffset, scaledWidth, yOffset
+          );
 
-            // Right area
-            for (let x = width - xOffset; x < width; x++) {
-              const edgePixel = edges.right[Math.floor(((x - (width - xOffset)) / xOffset) * edges.right.length) % edges.right.length];
-              ctx.fillStyle = `rgba(${edgePixel[0]}, ${edgePixel[1]}, ${edgePixel[2]}, ${edgePixel[3] / 255})`;
-              ctx.fillRect(x, yOffset, 1, scaledHeight);
-            }
+          // Left edge
+          copyStrip(
+            ctx,
+            img,
+            0, 0, stripW, originalDimensions.height,
+            0, yOffset, xOffset, scaledHeight
+          );
 
-            // Draw the original image scaled in the center
-            ctx.drawImage(img, xOffset, yOffset, scaledWidth, scaledHeight);
+          // Right edge
+          copyStrip(
+            ctx,
+            img,
+            originalDimensions.width - stripW, 0, stripW, originalDimensions.height,
+            width - xOffset, yOffset, xOffset, scaledHeight
+          );
+
+          // Corners
+          // Top-left
+          copyStrip(
+            ctx,
+            img,
+            0, 0, stripW, stripH,
+            0, 0, xOffset, yOffset
+          );
+
+          // Top-right
+          copyStrip(
+            ctx,
+            img,
+            originalDimensions.width - stripW, 0, stripW, stripH,
+            width - xOffset, 0, xOffset, yOffset
+          );
+
+          // Bottom-left
+          copyStrip(
+            ctx,
+            img,
+            0, originalDimensions.height - stripH, stripW, stripH,
+            0, height - yOffset, xOffset, yOffset
+          );
+
+          // Bottom-right
+          copyStrip(
+            ctx,
+            img,
+            originalDimensions.width - stripW, originalDimensions.height - stripH, stripW, stripH,
+            width - xOffset, height - yOffset, xOffset, yOffset
+          );
+
+          // Draw the original image scaled in the center
+          ctx.drawImage(img, xOffset, yOffset, scaledWidth, scaledHeight);
+
+          // Set canvas ref for file size estimation
+          if (canvasRef.current) {
+            canvasRef.current.width = width;
+            canvasRef.current.height = height;
+            canvasRef.current.getContext('2d')?.drawImage(canvas, 0, 0);
+            updateFileSize();
           }
+
+          const resizedUrl = canvas.toDataURL("image/png");
+          setResized(resizedUrl);
         }
       }
-
-      const resizedUrl = canvas.toDataURL("image/png");
-      setResized(resizedUrl);
     };
     img.src = URL.createObjectURL(image);
   };
 
   const handleDownload = () => {
     if (!resized) return;
+
+    let mimeType = "image/png";
+    if (format === "jpeg" || format === "jpg") mimeType = "image/jpeg";
+    if (format === "webp") mimeType = "image/webp";
+
     const a = document.createElement("a");
     a.href = resized;
-    a.download = "resized-image.png";
+    a.download = `resized-image.${format}`;
     a.click();
   };
 
   // Check if background extension mode should be available
   const shouldShowExtendMode = originalDimensions && width && height && 
     Math.abs((originalDimensions.width / originalDimensions.height) - (width / height)) > 0.01;
+
+  const clarityNote: Record<ExportFormat, string> = {
+    png: "Lossless, best clarity, larger file.",
+    jpeg: "Lossy compression, smaller file, slight quality drop.",
+    jpg: "Same as JPEG, widely supported.",
+    webp: "Good balance, modern browsers only.",
+  };
 
   return (
     <>
@@ -261,10 +313,65 @@ export default function ImageResizer() {
                       Background Extender
                     </label>
                   </div>
+                  
+                  {/* Background extender options */}
                   {mode === "extend" && (
-                    <p className="text-xs text-blue-600 mt-2">
-                      The image borders will be extended to fill the space
-                    </p>
+                    <div className="mt-4 space-y-4">
+                      <div>
+                        <label className="text-sm text-blue-900">
+                          Edge Strip Size: {edgeSize}px
+                        </label>
+                        <input
+                          type="range"
+                          min={1}
+                          max={
+                            originalDimensions
+                              ? Math.min(300, Math.min(originalDimensions.width, originalDimensions.height))
+                              : 300
+                          }
+                          value={edgeSize}
+                          onChange={(e) => setEdgeSize(parseInt(e.target.value))}
+                          className="w-full mt-2"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm text-blue-900">Export Format:</label>
+                        <select
+                          value={format}
+                          onChange={(e) => setFormat(e.target.value as ExportFormat)}
+                          className="p-2 rounded-md border border-blue-300 text-blue-900 w-full mt-1"
+                        >
+                          <option value="png">PNG</option>
+                          <option value="jpeg">JPEG</option>
+                          <option value="jpg">JPG</option>
+                          <option value="webp">WebP</option>
+                        </select>
+                      </div>
+
+                      {(format === "jpeg" || format === "jpg" || format === "webp") && (
+                        <div>
+                          <label className="text-sm text-blue-900">
+                            Quality: {Math.round(quality * 100)}%
+                          </label>
+                          <input
+                            type="range"
+                            min={10}
+                            max={100}
+                            value={quality * 100}
+                            onChange={(e) => setQuality(parseInt(e.target.value) / 100)}
+                            className="w-full mt-2"
+                          />
+                        </div>
+                      )}
+
+                      {estimatedSize && (
+                        <div className="text-xs text-blue-600 bg-white/60 rounded-lg p-2">
+                          <p><strong>Estimated Size:</strong> {estimatedSize}</p>
+                          <p><strong>Clarity:</strong> {clarityNote[format]}</p>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
@@ -294,6 +401,9 @@ export default function ImageResizer() {
             </div>
           )}
         </div>
+
+        {/* Hidden canvas for file size estimation */}
+        <canvas ref={canvasRef} className="hidden" />
 
         <p className="text-blue-900 text-sm mt-12">
           Resize images instantly — no quality loss, no waiting.

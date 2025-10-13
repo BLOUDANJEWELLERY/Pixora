@@ -87,7 +87,7 @@ export default function SidebarHeader(): ReactElement {
       ),
     },
     {
-      href: "/resize-image",
+      href: "/image-resizer",
       label: "Image Resizer",
       icon: (
         <svg

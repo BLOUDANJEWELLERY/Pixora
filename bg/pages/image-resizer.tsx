@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Header from "../components/Header";
 
 export default function ResizeImagePage() {
@@ -7,19 +7,14 @@ export default function ResizeImagePage() {
   const [resizedImage, setResizedImage] = useState<string | null>(null);
   const [width, setWidth] = useState<number | null>(null);
   const [height, setHeight] = useState<number | null>(null);
+  const [mode, setMode] = useState<"stretch" | "extend">("stretch");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      setImage(ev.target?.result as string);
-      setResizedImage(null);
-      setWidth(null);
-      setHeight(null);
-    };
+    reader.onload = (ev) => setImage(ev.target?.result as string);
     reader.readAsDataURL(file);
   };
 
@@ -31,12 +26,47 @@ export default function ResizeImagePage() {
     img.onload = () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      canvas.width = width;
-      canvas.height = height;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      ctx.drawImage(img, 0, 0, width, height);
+      canvas.width = width;
+      canvas.height = height;
+
+      if (mode === "stretch") {
+        // --- STANDARD RESIZE ---
+        ctx.drawImage(img, 0, 0, width, height);
+      } else {
+        // --- BACKGROUND EXTENSION MODE ---
+        const w = img.width;
+        const h = img.height;
+
+        // Center position
+        const x = (width - w) / 2;
+        const y = (height - h) / 2;
+
+        // Draw blurred edges on sides
+        const extendSize = 40; // thickness of edge strips
+
+        // Left strip
+        ctx.drawImage(img, 0, 0, extendSize, h, x - extendSize, y, extendSize, h);
+        // Right strip
+        ctx.drawImage(img, w - extendSize, 0, extendSize, h, x + w, y, extendSize, h);
+        // Top strip
+        ctx.drawImage(img, 0, 0, w, extendSize, x, y - extendSize, w, extendSize);
+        // Bottom strip
+        ctx.drawImage(img, 0, h - extendSize, w, extendSize, x, y + h, w, extendSize);
+
+        // Slight blur (simulated using globalAlpha layering)
+        ctx.globalAlpha = 0.7;
+        ctx.filter = "blur(20px)";
+        ctx.drawImage(canvas, 0, 0);
+        ctx.globalAlpha = 1.0;
+        ctx.filter = "none";
+
+        // Draw original image on top (centered)
+        ctx.drawImage(img, x, y, w, h);
+      }
+
       const resizedDataUrl = canvas.toDataURL("image/jpeg", 1.0);
       setResizedImage(resizedDataUrl);
     };
@@ -66,6 +96,30 @@ export default function ResizeImagePage() {
             onChange={handleImageUpload}
             className="mb-4 border border-blue-300 rounded-lg p-2 bg-blue-50 cursor-pointer text-blue-900"
           />
+
+          {/* Mode Selector */}
+          <div className="flex gap-4 mb-4">
+            <button
+              onClick={() => setMode("stretch")}
+              className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                mode === "stretch"
+                  ? "bg-blue-600 text-white"
+                  : "bg-blue-100 text-blue-900 hover:bg-blue-200"
+              }`}
+            >
+              Stretch Image
+            </button>
+            <button
+              onClick={() => setMode("extend")}
+              className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                mode === "extend"
+                  ? "bg-blue-600 text-white"
+                  : "bg-blue-100 text-blue-900 hover:bg-blue-200"
+              }`}
+            >
+              Extend Background
+            </button>
+          </div>
 
           {image && (
             <>

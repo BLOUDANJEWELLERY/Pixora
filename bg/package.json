@@ -19,6 +19,7 @@
     "fluent-ffmpeg": "^2.1.3",
     "formidable": "^3.5.4",
     "fs": "^0.0.1-security",
+    "icojs": "^0.19.5",
     "jspdf": "^3.0.2",
     "next": "15.5.3",
     "onnxruntime-web": "^1.21.0",

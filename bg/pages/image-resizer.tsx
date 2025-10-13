@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../components/Header";
 
 type ResizeMode = "stretch" | "extend";
-type ExportFormat = "png" | "jpeg" | "jpg" | "webp";
+type ExportFormat = "png" | "jpeg" | "jpg" | "webp" | "ico" | "heif" | "heic" | "svg" | "tiff" | "avif";
 
 export default function ImageResizer() {
   const [image, setImage] = useState<File | null>(null);
@@ -40,30 +40,47 @@ export default function ImageResizer() {
     img.src = url;
   };
 
+  // Reset dimensions to original
+  const handleResetDimensions = () => {
+    if (originalDimensions) {
+      setWidth(originalDimensions.width);
+      setHeight(originalDimensions.height);
+    }
+  };
+
   // Estimate file size
   const updateFileSize = useCallback(() => {
     if (!canvasRef.current) return;
     let mimeType = "image/png";
     if (format === "jpeg" || format === "jpg") mimeType = "image/jpeg";
     if (format === "webp") mimeType = "image/webp";
+    if (format === "ico") mimeType = "image/x-icon";
+    if (format === "tiff") mimeType = "image/tiff";
+    if (format === "avif") mimeType = "image/avif";
+    // Note: HEIF/HEIC and SVG are not directly supported by canvas
 
-    const dataUrl =
-      mimeType === "image/png"
-        ? canvasRef.current.toDataURL(mimeType)
-        : canvasRef.current.toDataURL(mimeType, quality);
+    try {
+      const dataUrl =
+        mimeType === "image/png"
+          ? canvasRef.current.toDataURL(mimeType)
+          : canvasRef.current.toDataURL(mimeType, quality);
 
-    const base64Length = dataUrl.length - (dataUrl.indexOf(",") + 1);
-    const paddingBytes =
-      dataUrl.charAt(dataUrl.length - 2) === "="
-        ? 2
-        : dataUrl.charAt(dataUrl.length - 1) === "="
-        ? 1
-        : 0;
-    const fileSizeBytes = base64Length * 0.75 - paddingBytes;
-    const fileSizeKB = fileSizeBytes / 1024;
-    const fileSizeMB = fileSizeKB / 1024;
+      const base64Length = dataUrl.length - (dataUrl.indexOf(",") + 1);
+      const paddingBytes =
+        dataUrl.charAt(dataUrl.length - 2) === "="
+          ? 2
+          : dataUrl.charAt(dataUrl.length - 1) === "="
+          ? 1
+          : 0;
+      const fileSizeBytes = base64Length * 0.75 - paddingBytes;
+      const fileSizeKB = fileSizeBytes / 1024;
+      const fileSizeMB = fileSizeKB / 1024;
 
-    setEstimatedSize(fileSizeMB > 1 ? `${fileSizeMB.toFixed(2)} MB` : `${fileSizeKB.toFixed(1)} KB`);
+      setEstimatedSize(fileSizeMB > 1 ? `${fileSizeMB.toFixed(2)} MB` : `${fileSizeKB.toFixed(1)} KB`);
+    } catch (error) {
+      // Handle unsupported formats
+      setEstimatedSize("Format not supported");
+    }
   }, [format, quality]);
 
   const copyStrip = (
@@ -221,12 +238,38 @@ export default function ImageResizer() {
     if (!resized) return;
 
     let mimeType = "image/png";
-    if (format === "jpeg" || format === "jpg") mimeType = "image/jpeg";
-    if (format === "webp") mimeType = "image/webp";
+    let fileExtension = "png";
+    
+    switch (format) {
+      case "jpeg":
+      case "jpg":
+        mimeType = "image/jpeg";
+        fileExtension = "jpg";
+        break;
+      case "webp":
+        mimeType = "image/webp";
+        fileExtension = "webp";
+        break;
+      case "ico":
+        mimeType = "image/x-icon";
+        fileExtension = "ico";
+        break;
+      case "tiff":
+        mimeType = "image/tiff";
+        fileExtension = "tiff";
+        break;
+      case "avif":
+        mimeType = "image/avif";
+        fileExtension = "avif";
+        break;
+      default:
+        mimeType = "image/png";
+        fileExtension = "png";
+    }
 
     const a = document.createElement("a");
     a.href = resized;
-    a.download = `resized-image.${format}`;
+    a.download = `resized-image.${fileExtension}`;
     a.click();
   };
 
@@ -239,6 +282,17 @@ export default function ImageResizer() {
     jpeg: "Lossy compression, smaller file, slight quality drop.",
     jpg: "Same as JPEG, widely supported.",
     webp: "Good balance, modern browsers only.",
+    ico: "Icon format, multiple sizes, limited browser support.",
+    heif: "High Efficiency Image Format, limited browser support.",
+    heic: "HEIF variant, limited browser support.",
+    svg: "Vector format, not supported for raster images.",
+    tiff: "High quality, large files, limited browser support.",
+    avif: "Modern format, excellent compression, growing support.",
+  };
+
+  // Check if format is supported by most browsers
+  const isFormatWellSupported = (fmt: ExportFormat): boolean => {
+    return ["png", "jpeg", "jpg", "webp"].includes(fmt);
   };
 
   return (
@@ -250,12 +304,18 @@ export default function ImageResizer() {
         </h1>
 
         <div className="bg-white/40 backdrop-blur-lg p-8 rounded-3xl shadow-2xl border border-blue-200 border-opacity-30 flex flex-col items-center w-full max-w-md gap-6">
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="text-blue-900 cursor-pointer"
-          />
+          {/* Centered file input */}
+          <div className="w-full flex justify-center">
+            <label className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-xl font-semibold shadow-md transition-all cursor-pointer text-center inline-block min-w-[200px]">
+              Choose File
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+            </label>
+          </div>
 
           {preview && (
             <>
@@ -265,13 +325,13 @@ export default function ImageResizer() {
                 className="w-48 h-48 object-contain rounded-xl border border-blue-200"
               />
 
-              <div className="flex gap-4">
+              <div className="flex gap-4 items-end">
                 <div>
                   <label className="text-sm text-blue-900">Width</label>
                   <input
                     type="number"
                     value={width}
-                    onChange={(e) => setWidth(parseInt(e.target.value))}
+                    onChange={(e) => setWidth(parseInt(e.target.value) || 0)}
                     className="w-24 p-2 rounded-md border border-blue-300 text-blue-900"
                   />
                 </div>
@@ -281,10 +341,19 @@ export default function ImageResizer() {
                   <input
                     type="number"
                     value={height}
-                    onChange={(e) => setHeight(parseInt(e.target.value))}
+                    onChange={(e) => setHeight(parseInt(e.target.value) || 0)}
                     className="w-24 p-2 rounded-md border border-blue-300 text-blue-900"
                   />
                 </div>
+                
+                {/* Reset Button */}
+                <button
+                  onClick={handleResetDimensions}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-xl font-semibold shadow-md transition-all text-sm"
+                  title="Reset to original dimensions"
+                >
+                  Reset
+                </button>
               </div>
 
               {/* Mode selector - only show when aspect ratios differ */}
@@ -346,10 +415,16 @@ export default function ImageResizer() {
                           <option value="jpeg">JPEG</option>
                           <option value="jpg">JPG</option>
                           <option value="webp">WebP</option>
+                          <option value="avif">AVIF</option>
+                          <option value="ico">ICO</option>
+                          <option value="tiff">TIFF</option>
+                          <option value="heif">HEIF</option>
+                          <option value="heic">HEIC</option>
+                          <option value="svg">SVG</option>
                         </select>
                       </div>
 
-                      {(format === "jpeg" || format === "jpg" || format === "webp") && (
+                      {(format === "jpeg" || format === "jpg" || format === "webp" || format === "avif") && (
                         <div>
                           <label className="text-sm text-blue-900">
                             Quality: {Math.round(quality * 100)}%
@@ -369,6 +444,11 @@ export default function ImageResizer() {
                         <div className="text-xs text-blue-600 bg-white/60 rounded-lg p-2">
                           <p><strong>Estimated Size:</strong> {estimatedSize}</p>
                           <p><strong>Clarity:</strong> {clarityNote[format]}</p>
+                          {!isFormatWellSupported(format) && (
+                            <p className="text-orange-600 font-semibold mt-1">
+                              Note: Limited browser support
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -396,7 +476,7 @@ export default function ImageResizer() {
                 onClick={handleDownload}
                 className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl font-semibold shadow-md transition-all"
               >
-                Download Resized Image
+                Download as {format.toUpperCase()}
               </button>
             </div>
           )}
